@@ -37,6 +37,30 @@ export function githubConflictStatus(pr, lifecycle) {
   return null
 }
 
+function normalizeRequiredChecks(value) {
+  if (!Array.isArray(value)) return null
+  return [...new Set(value.map((name) => String(name).trim()).filter(Boolean))]
+}
+
+export function configuredRequiredChecks(config, key) {
+  const direct = normalizeRequiredChecks(config?.githubRequiredChecks)
+  if (direct) return direct
+
+  const repoKey = `${key?.workspace ?? ''}/${key?.repo ?? ''}`.toLowerCase()
+  const mapped = config?.githubRequiredChecks
+  if (mapped && typeof mapped === 'object' && !Array.isArray(mapped)) {
+    const entry = Object.entries(mapped).find(([name]) => name.toLowerCase() === repoKey)
+    if (entry) return normalizeRequiredChecks(entry[1])
+  }
+
+  const repository = (config?.repositories ?? []).find((candidate) =>
+    (candidate.provider ?? 'github') === 'github' &&
+    String(candidate.workspace ?? '').toLowerCase() === String(key?.workspace ?? '').toLowerCase() &&
+    String(candidate.repo ?? '').toLowerCase() === String(key?.repo ?? '').toLowerCase(),
+  )
+  return normalizeRequiredChecks(repository?.requiredChecks)
+}
+
 export function githubCiState(combinedStatus, checkRuns = [], requiredCheckNames = null) {
   if (!Array.isArray(requiredCheckNames)) return 'unknown'
   if (requiredCheckNames.length === 0) return 'green'
