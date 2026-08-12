@@ -1,17 +1,22 @@
 ## QA Demo Report
 
-- **Target:** `fixtures/dummy-java-taskboard` (dummy Java Task Board)
+- **Target:** `fixtures/dummy-java-taskboard` (public dummy Java Task Board)
+- **Fresh run:** 2026-08-13
 - **What we proved:**
-  - Add high-priority task (mirrors `TaskBoardService.addTask`)
-  - Mark complete
-  - Filter → Completed shows task
-  - Active filter empty state after completion
-  - Empty-title validation error
-- **Boot method:** Local app preview — `python3 -m http.server 8877 --directory public` (why: no Storybook/e2e; static UI mirrors Java domain; port 8765 owned by Lumine)
+  - Add a high-priority task
+  - Mark it complete
+  - Filter → Completed shows the task
+  - Active filter shows the empty state after completion
+  - Empty-title validation is visible
+  - Viewer-facing captions appear on every major beat
+- **Boot method:** `python3 -m http.server 8877 --directory fixtures/dummy-java-taskboard/public`
 - **Result:** **PASS**
 - **Artifacts:**
-  - Video: `testreel-output/demo/recording-2026-08-12_18-57-40-087.mp4`
-  - Screenshot: `testreel-output/demo/final-2026-08-12_18-57-39-770.png`
+  - Video: `testreel-output/demo/recording-2026-08-13_04-50-24-092.mp4`
+  - Screenshot: `testreel-output/demo/final-2026-08-13_04-50-23-766.png`
+  - Caption contact sheet: `testreel-output/demo/contact-sheet.jpg`
 - **Runner:** `scripts/qa-demo-runner.mjs` (TestReel `recordPage` + skill `caption-overlay.mjs`)
-- **Theme:** Atlassian blue chrome (`#0052CC` → `#0747A6`) on TestReel frame + app surface.
-- **Residual risks:** No JRE on this host — Java sources are domain contract only; UI is the JS mirror. Captions rendered via DOM `#__sdlc_caption`.
+- **Video evidence:** 22.40 seconds, 3,783,122 bytes, MP4 post-processing succeeded.
+- **Revision:** `12a6986-dirty` (rebased working tree used for pre-commit proof)
+- **Public safety:** The fixture, captions, and report contain no private service, customer, or repository data.
+- **Residual risk:** Java sources are the domain contract; the recorded static UI is their browser-facing mirror.

@@ -141,6 +141,14 @@ Use only when README requires it for local UI, or when no Node script can serve 
 
 Boot the docs `dev` script and demo the documented UI only if no interactive app/Storybook exists.
 
+## No visual surface
+
+If changed files and acceptance criteria are backend-, protocol-, migration-, or config-only and none of the surfaces above render the changed behavior, return `NOT_APPLICABLE`. List the evidence inspected and recommend the matching unit, integration, or API proof. Do not create a fake UI for the recording.
+
+## Authenticated surfaces
+
+Reuse repository-owned Playwright setup or `storageState` when available. Complete interactive login before recording and keep credentials, cookies, SSO, and 2FA out of artifacts. A missing test account is `BLOCKED`, not a feature failure.
+
 ## Decision log (copy into QA report)
 
 ```text

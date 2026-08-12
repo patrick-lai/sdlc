@@ -1,162 +1,103 @@
 /**
- * Portable PR Warden link parser.
- * Behavioral reference: ~/claude/raphael/Sources/RaphaelCore/PRWardenLink.swift
- * Pure and total — every refusal carries a reason. Bitbucket Cloud only.
+ * Provider-neutral pull-request link parser.
+ * Pure and total: every refusal carries a reason.
  */
 
 /**
- * @typedef {{ workspace: string, repo: string, number: number }} PRWardenKey
+ * @typedef {'github'|'bitbucket'} PRProvider
+ * @typedef {{ provider?: PRProvider, workspace: string, repo: string, number: number }} PRWardenKey
  * @typedef {{ key: PRWardenKey, url: string }} PRWardenLink
  * @typedef {{ ok: true, link: PRWardenLink } | { ok: false, failure: string, message: string }} ParseResult
  */
 
-/**
- * @param {string} workspace
- * @param {string} repo
- * @param {number} number
- * @returns {PRWardenLink}
- */
-export function makeLink(workspace, repo, number) {
+/** @param {string} workspace @param {string} repo @param {number} number @param {PRProvider} [provider] */
+export function makeLink(workspace, repo, number, provider = 'bitbucket') {
   const key = {
+    provider,
     workspace: workspace.toLowerCase(),
     repo: repo.toLowerCase(),
     number,
   }
-  return {
-    key,
-    url: `https://bitbucket.org/${key.workspace}/${key.repo}/pull-requests/${key.number}`,
-  }
+  const url = provider === 'github'
+    ? `https://github.com/${key.workspace}/${key.repo}/pull/${key.number}`
+    : `https://bitbucket.org/${key.workspace}/${key.repo}/pull-requests/${key.number}`
+  return { key, url }
 }
 
-/**
- * Canonical key string used across ledger, audit, and idempotency.
- * Nullish / incomplete keys fall back to a stable placeholder so scheduled
- * sweeps never crash mid-batch.
- * @param {PRWardenKey | null | undefined} key
- */
+/** @param {PRWardenKey | null | undefined} key */
 export function keyDescription(key) {
+  const provider = key?.provider ?? 'bitbucket'
   if (
-    key == null ||
-    key.workspace == null ||
-    key.repo == null ||
-    key.number == null ||
+    key == null || key.workspace == null || key.repo == null || key.number == null ||
     !Number.isFinite(Number(key.number))
   ) {
-    return 'bitbucket:unknown/unknown#0'
+    return `${provider}:unknown/unknown#0`
   }
-  return `bitbucket:${key.workspace}/${key.repo}#${key.number}`
+  return `${provider}:${String(key.workspace).toLowerCase()}/${String(key.repo).toLowerCase()}#${key.number}`
 }
 
-/**
- * @param {string | null | undefined} raw
- * @returns {number | null}
- */
 function positiveInt(raw) {
   if (raw == null || raw === '') return null
   const value = Number.parseInt(String(raw), 10)
-  if (!Number.isFinite(value) || value <= 0) return null
-  // Reject absurd "numbers" that would overflow paste noise
-  if (String(raw).length > 12) return null
+  if (!Number.isFinite(value) || value <= 0 || String(raw).length > 12) return null
   return value
 }
 
-/**
- * @param {string} text
- */
-function split(text) {
-  let rest = text
-  for (const scheme of ['https://', 'http://', 'ssh://']) {
-    if (rest.toLowerCase().startsWith(scheme)) {
-      rest = rest.slice(scheme.length)
-      break
-    }
-  }
-  let fragment = null
-  const hash = rest.indexOf('#')
-  if (hash >= 0) {
-    fragment = rest.slice(hash + 1)
-    rest = rest.slice(0, hash)
-  }
-  const query = rest.indexOf('?')
-  if (query >= 0) rest = rest.slice(0, query)
-
-  let comps = rest.split('/').filter(Boolean)
-  let host = null
-  if (comps[0] && comps[0].includes('.') && !comps[0].startsWith('.')) {
-    host = comps[0].toLowerCase()
-    if (host.startsWith('www.')) host = host.slice(4)
-    comps = comps.slice(1)
-  }
-  return { host, comps, fragment }
+function clean(raw) {
+  return String(raw ?? '').trim().replace(/^[<>"']+|[<>"']+$/g, '')
 }
 
 /**
- * Accept Bitbucket PR URLs and shorthands `ws/repo#42`, `ws/repo/pull-requests/42`.
+ * Accept GitHub and Bitbucket Cloud PR URLs plus explicit shorthands:
+ * `github:owner/repo#42` and `bitbucket:workspace/repo#42`.
+ * The legacy unprefixed `workspace/repo#42` shorthand remains Bitbucket.
  * @param {string} raw
  * @returns {ParseResult}
  */
 export function parsePRLink(raw) {
-  const text = String(raw ?? '')
-    .trim()
-    .replace(/^[<>"']+|[<>"']+$/g, '')
-  if (!text) {
-    return {
-      ok: false,
-      failure: 'empty',
-      message: 'Paste a pull request link first.',
-    }
+  const text = clean(raw)
+  if (!text) return { ok: false, failure: 'empty', message: 'Paste a pull request link first.' }
+
+  const shorthand = text.match(/^(?:(github|bitbucket):)?([^/\s]+)\/([^/#\s]+)#(\d+)$/i)
+  if (shorthand) {
+    const provider = /** @type {PRProvider} */ ((shorthand[1]?.toLowerCase() || 'bitbucket'))
+    const number = positiveInt(shorthand[4])
+    if (number != null) return { ok: true, link: makeLink(shorthand[2], shorthand[3], number, provider) }
+  }
+  const legacyBitbucket = text.match(/^([^/\s]+)\/([^/\s]+)\/pull-requests\/(\d+)$/i)
+  if (legacyBitbucket) {
+    const number = positiveInt(legacyBitbucket[3])
+    if (number != null) return { ok: true, link: makeLink(legacyBitbucket[1], legacyBitbucket[2], number, 'bitbucket') }
   }
 
-  const parsed = split(text)
-  const { host, comps, fragment } = parsed
+  try {
+    const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(text) ? text : `https://${text}`
+    const url = new URL(candidate)
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    const parts = url.pathname.split('/').filter(Boolean)
 
-  // Shorthand: workspace/repo#42
-  if (host == null && comps.length === 2) {
-    const number = positiveInt(fragment)
-    if (number != null) {
-      return { ok: true, link: makeLink(comps[0], comps[1], number) }
+    if (host === 'github.com' && parts.length >= 4 && parts[2] === 'pull') {
+      const number = positiveInt(parts[3])
+      if (number != null) return { ok: true, link: makeLink(parts[0], parts[1], number, 'github') }
     }
-  }
-
-  const prIndex = comps.indexOf('pull-requests')
-  if (prIndex >= 2) {
-    const number = positiveInt(comps[prIndex + 1])
-    if (number != null) {
-      if (host != null && host !== 'bitbucket.org') {
-        return {
-          ok: false,
-          failure: 'unsupportedProvider',
-          message: `PR Warden reads Bitbucket pull requests — ${host} isn't wired up yet.`,
-        }
-      }
+    if (host === 'bitbucket.org' && parts.length >= 4 && parts[2] === 'pull-requests') {
+      const number = positiveInt(parts[3])
+      if (number != null) return { ok: true, link: makeLink(parts[0], parts[1], number, 'bitbucket') }
+    }
+    if (parts.includes('pull') || parts.includes('pull-requests') || parts.includes('merge_requests')) {
       return {
-        ok: true,
-        link: makeLink(comps[prIndex - 2], comps[prIndex - 1], number),
+        ok: false,
+        failure: 'unsupportedProvider',
+        message: `PR Warden supports public GitHub and Bitbucket Cloud pull requests; ${host} is not supported.`,
       }
     }
-  }
-
-  if (host === 'github.com' || comps.includes('pull')) {
-    return {
-      ok: false,
-      failure: 'unsupportedProvider',
-      message:
-        "PR Warden reads Bitbucket pull requests — GitHub isn't wired up yet.",
-    }
-  }
-  if (comps.includes('merge_requests')) {
-    const provider = host === 'gitlab.com' ? 'GitLab' : host ?? 'this host'
-    return {
-      ok: false,
-      failure: 'unsupportedProvider',
-      message: `PR Warden reads Bitbucket pull requests — ${provider} isn't wired up yet.`,
-    }
+  } catch {
+    // Fall through to the stable refusal below.
   }
 
   return {
     ok: false,
     failure: 'notAPullRequest',
-    message:
-      "That isn't a pull request link. Expected bitbucket.org/workspace/repo/pull-requests/123.",
+    message: 'Expected github.com/owner/repo/pull/123 or bitbucket.org/workspace/repo/pull-requests/123.',
   }
 }

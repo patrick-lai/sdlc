@@ -1,116 +1,97 @@
 ---
 name: pr-warden
 description: >
-  Keep open Bitbucket PRs healthy: re-read them, fix red CI / conflicts /
-  review feedback when safe, never merge. Use when the user says /pr-warden,
-  "keep my PRs healthy", "babysit my PRs", scheduled PR sweep, explain why a
-  PR is stuck, merge readiness, or follow-up after a repair.
+  Keep GitHub or Bitbucket pull requests healthy: re-read them, fix red CI,
+  conflicts, and review feedback when safe, and never merge. Use when the user
+  says /pr-warden, "keep my PRs healthy", "babysit my PRs", asks why a PR is
+  stuck, or schedules a pull-request health sweep.
 ---
 
 # pr-warden
 
-One skill. One install. Modes are just how you phrase the prompt.
+One public skill, one install. It works with GitHub and Bitbucket pull requests and does not require a particular company toolchain.
 
-## What you say
-
-```text
-/pr-warden keep all my prs healthy
-```
-
-| Intent | Prompt |
-|--------|--------|
-| Default / schedule (30m) | `/pr-warden keep all my prs healthy` |
-| One PR | `/pr-warden babysit <bitbucket-pr-url>` |
-| Explain | `/pr-warden explain <pr>` |
-| Ready to merge? | `/pr-warden readiness <pr>` |
-| After a fix | `/pr-warden followup <pr>` |
-
-Schedule the default line **every 30 minutes**. Needs `twg` signed in. No fixtures required.
-
-## What the agent does (each run)
-
-1. **Load run state** from `.pr-warden-state.json` in the workspace root (create if missing).
-2. **List open PRs** (Raphael `pr_warden_status` / Today, else twg open PRs for the user).
-3. **For each open PR** — full read via twg.
-4. **Decide**
-   - CI running or human-only gates (approvals, mark ready) → note; no code change.
-   - Ready to merge → tell user; **never merge**.
-   - Red CI / conflicts / code review feedback → repair only if under attempt budget (below).
-5. **Reply short** — one line per PR that changed or needs the user. Silence is OK when nothing changed.
-6. **Write the HTML report** (do not invent HTML/CSS). Fill the baked template:
-
-   ```bash
-   node skills/pr-warden/scripts/adapter.mjs digest \
-     --fixture-dir <snapshots-or-live-dir> \
-     --html .pr-warden-report.html
-   ```
-
-   Template: [`templates/report.html`](templates/report.html). Adapter injects envelope data only. Copy lives in `scripts/lib/copy.mjs` — do not rewrite helper sentences in the page.
-
-### Hard rules (always)
-
-- **Never merge.** Never approve / mark-ready as a human.
-- Push only to the **PR source branch** (force-with-lease only after your rebase on that branch).
-- Prefer an isolated worktree.
-- Auth/read failure → skip with a note; do not invent green.
-
-### Trusted paths (required for any automatic edit)
-
-Automatic edits are **PR branch + trusted paths only**. Before editing or pushing:
-
-1. Collect the file list you intend to change.
-2. Keep only paths under trusted globs (repo override in `.pr-warden-state.json` → `trustedPaths`, else defaults: `src/**`, `lib/**`, `app/**`, `packages/*/src/**`, `tests/**`, `docs/**`, `*.md`, lockfiles — same as `scripts/lib/trusted-paths.mjs` `DEFAULT_TRUSTED_PATHS`).
-3. Reject traversal (`..`) and anything outside the list. If **no** intended files are trusted, **do not push** — hand off: “needs you (out of trusted paths)”.
-4. Optional check:  
-   `node skills/pr-warden/scripts/adapter.mjs gate-paths --files 'a,b' --trusted 'src/**,lib/**'`
-
-### Attempt budget (stop looping)
-
-Per PR key `bitbucket:ws/repo#n` in `.pr-warden-state.json`:
-
-| Field | Meaning |
-|-------|---------|
-| `attempts` | Auto-repair pushes this watch has spent |
-| `fingerprint` | Hash/summary of last repairable conditions you acted on |
-| `escalated` | If true, **no more auto-repair** until human activity changes the picture |
-
-- **Max automatic repairs: 3** per PR (same as policy `maxRepairAttempts`).
-- After a push that tried to fix: `attempts += 1`, store fingerprint.
-- If `attempts >= 3` and still repairable → set `escalated: true`, **stop fixing**, tell the user once (“automatic attempts exhausted — your turn”).
-- Reset `attempts` / `escalated` only when **new human activity** clearly changes the PR (new reviewer feedback after your last push, or user asks to retry) — not merely because 30 minutes passed.
-- Same fingerprint as last tick and nothing new to do → **no re-push**, no extra comments.
-
-### First scheduled ticks / side effects
-
-- **Default is live repair** when the user asked to keep PRs healthy (they want action).
-- Still respect trusted paths + attempt budget + fingerprint skip above (this is the lightweight ledger; full adapter CLI is optional).
-- If state file has `"observeOnly": true`, **only report** — no edits/pushes/comments until the user clears it or says “go live”.
-- Do not spam PR comments every 30m; comment only on handoff / escalate / meaningful change.
-
-### If Raphael has PR Warden tools
-
-Prefer `pr_warden_watch` / `pr_warden_status` / `pr_warden_stop`. Don’t double-babysit the same PR outside that ledger.
-
-## Schedule every 30 minutes
+## Start
 
 ```text
 /pr-warden keep all my prs healthy
-
-Re-check my open Bitbucket PRs. Fix red CI, conflicts, and code review feedback only on trusted paths, at most 3 auto-repair attempts per PR, then hand off. Never merge. Skip no-op ticks. Short per-PR status only when something changed or needs me.
+/pr-warden babysit https://github.com/OWNER/REPO/pull/123
+/pr-warden explain <pull-request-url>
+/pr-warden readiness <pull-request-url>
 ```
 
-Install once:
+For a scheduled watch, run the first prompt every 30 minutes. Use the provider credentials already available to the coding agent (`gh`/`GITHUB_TOKEN` for private GitHub repositories, or the equivalent Bitbucket connector). Public GitHub PRs can be inspected without credentials:
+
+```bash
+node .agents/skills/pr-warden/scripts/adapter.mjs inspect \
+  --url https://github.com/patrick-lai/sdlc/pull/2
+```
+
+## Every run
+
+1. Load `.pr-warden-state.json` from the workspace root; create it if absent.
+2. List the user's open PRs with the available provider CLI/API.
+3. Re-read each full PR: lifecycle, checks, conflicts, current review states, unresolved threads, and source branch.
+4. Classify it with `scripts/lib/policy.mjs`.
+5. Repair only red CI, conflicts, or current code-review feedback, and only within the safety rules below.
+6. Report ready/waiting/handoff states briefly. **Never merge.**
+7. When the user wants a shareable status sheet, fill the baked HTML template with `--html`; do not invent a new page or rewrite its operator copy.
+
+### Hard safety rules
+
+- Never merge, approve, dismiss a review, or mark a PR ready on a person's behalf.
+- Push only to the PR source branch. Prefer an isolated worktree.
+- A missing or failed read is unknown, never green.
+- Start in read-only mode when the user's intent is explanation, readiness, audit, or proof.
+- Do not comment on unchanged scheduled ticks.
+
+### Trusted paths
+
+Before any automated code change, collect the intended files and check them with:
+
+```bash
+node .agents/skills/pr-warden/scripts/adapter.mjs gate-paths \
+  --files 'src/a.ts,tests/a.test.ts' \
+  --trusted 'src/**,lib/**,app/**,packages/*/src/**,tests/**,docs/**,*.md'
+```
+
+Reject traversal and anything outside the configured trusted globs. If nothing is trusted, hand off without pushing.
+
+### Attempt budget
+
+Store a record under the canonical key (`github:owner/repo#123` or `bitbucket:workspace/repo#123`):
+
+- `attempts`: repair pushes spent
+- `fingerprint`: repairable facts acted on
+- `escalated`: stops further automatic repair
+
+At most **3 automatic repair attempts** per PR. Do not repeat the same fingerprint. Reset only after new human activity or an explicit retry request.
+
+### Provider reads
+
+- GitHub: prefer `gh pr view <url> --json ...`; the adapter's `inspect` command is a credential-free fallback for public PRs.
+- Bitbucket: use the authenticated provider API/connector available in the environment.
+- Normalize evidence into the provider-neutral snapshot/envelope documented under `references/`.
+
+## Install
 
 ```bash
 npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
 ```
 
+Codex, Cursor, and compatible agents share `.agents/skills/`. Claude Code can install `pr-warden@sdlc` from the repository marketplace.
+
 ## Operator report
 
-Hand the user `.pr-warden-report.html` (or the path `--html` wrote). The page is the designed status sheet: Needs you / Warden can act / Waiting / Ready to merge. Each row has a **What this means** sentence. Never merge is chrome, not a suggestion.
+`run`, `sweep`, and `digest` accept `--html [path]`; omitting the path writes `.pr-warden-report.html`. The adapter injects envelopes into [`templates/report.html`](templates/report.html), grouping Needs you, Warden can act, Waiting, Ready, and Settled without changing policy. Hand the resulting file to the user when a visual digest is more useful than terminal JSON.
 
-`--html` on `run`, `sweep`, or `digest`. Default path: `.pr-warden-report.html`.
+```bash
+node .agents/skills/pr-warden/scripts/adapter.mjs digest   --fixture-dir <provider-snapshots>   --html .pr-warden-report.html
+```
 
-## Optional (debug only)
+## Local checks
 
-`npm run test:pr-warden` · `references/` · `scripts/` adapter (internal; not required day-to-day)
+```bash
+npm run test:pr-warden
+node skills/pr-warden/scripts/adapter.mjs inspect --url https://github.com/patrick-lai/sdlc/pull/2
+```

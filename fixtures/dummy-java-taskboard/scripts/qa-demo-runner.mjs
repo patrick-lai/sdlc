@@ -5,7 +5,7 @@
  */
 import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -101,6 +101,10 @@ async function main() {
     console.log(`[qa-demo] Target: ${BASE_URL}`)
     console.log(`[qa-demo] Output: ${OUT_DIR} (${format})`)
 
+    // Clean before Playwright starts writing its context video. Letting
+    // TestReel clean after newContext() can unlink the in-flight .webm.
+    rmSync(OUT_DIR, { recursive: true, force: true })
+    mkdirSync(OUT_DIR, { recursive: true })
     browser = await chromium.launch()
     const context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
@@ -119,7 +123,7 @@ async function main() {
         borderRadius: 12,
       },
       outputFormat: format,
-      clean: true,
+      clean: false,
     })
 
     const newTitle = 'Prove qa-demo on Java fixture'

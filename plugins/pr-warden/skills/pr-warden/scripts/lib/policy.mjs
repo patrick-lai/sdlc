@@ -1,6 +1,5 @@
 /**
  * Portable PR Warden policy.
- * Behavioral reference: ~/claude/raphael/Sources/RaphaelCore/PRWarden.swift (PRWardenPolicy)
  * Facts stay separate from decisions. mayMerge is permanently false.
  */
 
@@ -50,9 +49,6 @@ export const Policy = Object.freeze({
   readySafetyInterval: 12 * 3600,
   /** Bounded automatic repair attempts before escalate (portable default). */
   maxRepairAttempts: 3,
-  afmWorkspace: 'atlassian',
-  afmRepo: 'atlassian-frontend-monorepo',
-  afmBranchDeployPipeline: 'default-jira-branch-deploy',
 })
 
 /**
@@ -174,33 +170,6 @@ export function nextCheck(state, now = Date.now(), opts = {}) {
       return null
     default:
       return t + interval
-  }
-}
-
-/**
- * @param {string} workspace
- * @param {string} repo
- */
-export function isAFM(workspace, repo) {
-  return (
-    String(workspace).toLowerCase() === Policy.afmWorkspace &&
-    String(repo).toLowerCase() === Policy.afmRepo
-  )
-}
-
-/**
- * @param {{ workspace: string, repo: string, branch?: string|null, inFlightBuilds?: number[] }} args
- */
-export function afmBranchDeployAction({ workspace, repo, branch, inFlightBuilds = [] }) {
-  if (!isAFM(workspace, repo)) return { action: 'skipNotAFM' }
-  if (!branch) return { action: 'skipNoBranch' }
-  if (inFlightBuilds.length > 0) {
-    return { action: 'skipAlreadyInFlight', build: inFlightBuilds[0] }
-  }
-  return {
-    action: 'trigger',
-    branch,
-    pipeline: Policy.afmBranchDeployPipeline,
   }
 }
 

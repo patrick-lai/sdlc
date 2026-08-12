@@ -1,6 +1,6 @@
 {
   "name": "pr-warden",
-  "description": "Portable scheduled PR Warden for Bitbucket: mechanical reads, policy classification, bounded trusted-path repairs, Atlassian-native per-item actions. Never merges.",
+  "description": "Provider-neutral PR health for GitHub and Bitbucket: read-only inspection, bounded trusted-path repairs, and a permanent never-merge rule.",
   "version": "0.1.0",
   "author": {
     "name": "Patrick Lai",
@@ -10,12 +10,11 @@
   "license": "MIT",
   "keywords": [
     "pr",
+    "github",
     "bitbucket",
-    "jira",
     "warden",
     "review",
     "scheduled",
-    "twg",
     "sdlc"
   ]
 }
