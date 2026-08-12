@@ -21,6 +21,7 @@ import {
   isActionableByAgent,
   needsOperator,
   Policy,
+  PRWardenState,
   gatesFrom,
 } from './lib/policy.mjs'
 import { gateCodeChange, isTrustedPath } from './lib/trusted-paths.mjs'
@@ -28,6 +29,7 @@ import {
   latestReviewStates,
   githubConflictStatus,
   githubCiState,
+  unknownReviewFacts,
   readScheduledWatch,
 } from './lib/github.mjs'
 import {
@@ -134,36 +136,74 @@ test('GitHub conflicts require explicit dirty state', () => {
   assert.equal(githubConflictStatus({ mergeable: false, mergeable_state: 'dirty' }, 'merged'), false)
 })
 
-test('GitHub CI rollup distinguishes running, red, green, and indeterminate', () => {
+test('GitHub CI rollup acts only on identified required checks', () => {
+  const failed = [{ name: 'optional-lint', status: 'completed', conclusion: 'failure' }]
+  assert.equal(githubCiState({ state: 'failure' }, failed), 'unknown')
   assert.equal(
-    githubCiState(null, [{ status: 'in_progress', conclusion: null }]),
+    githubCiState(null, [{ name: 'build', status: 'in_progress', conclusion: null }], ['build']),
     'running',
   )
   assert.equal(
     githubCiState(
-      { state: 'success' },
-      [{ status: 'completed', conclusion: 'failure' }],
+      { statuses: [{ context: 'required-status', state: 'success' }] },
+      [{ name: 'build', status: 'completed', conclusion: 'failure' }],
+      ['build', 'required-status'],
     ),
     'red',
   )
   assert.equal(
     githubCiState(
-      { state: 'success' },
+      null,
       [
-        { status: 'completed', conclusion: 'success' },
-        { status: 'completed', conclusion: 'skipped' },
+        { name: 'build', status: 'completed', conclusion: 'success' },
+        { name: 'types', status: 'completed', conclusion: 'skipped' },
       ],
+      ['build', 'types'],
     ),
     'green',
   )
   assert.equal(
     githubCiState(
-      { state: 'success' },
-      [{ status: 'completed', conclusion: 'cancelled' }],
+      null,
+      [{ name: 'build', status: 'completed', conclusion: 'cancelled' }],
+      ['build'],
     ),
     'unknown',
   )
-  assert.equal(githubCiState(null, []), 'unknown')
+  assert.equal(githubCiState(null, [], ['build']), 'running')
+  assert.equal(githubCiState(null, [], []), 'green')
+})
+
+test('HTML fallback leaves current review state unknown and non-actionable', () => {
+  const reviewFacts = unknownReviewFacts()
+  assert.equal(reviewFacts.reviewStateKnown, false)
+  assert.equal(reviewFacts.changesRequested, null)
+  assert.equal(reviewFacts.approvalsSatisfied, null)
+  const envelope = buildResultEnvelope({
+    key: { provider: 'github', workspace: 'acme', repo: 'app', number: 9 },
+    facts: {
+      lifecycle: 'open',
+      isDraft: false,
+      ci: 'unknown',
+      requiredCiKnown: false,
+      hasConflicts: null,
+      unresolvedTasks: 0,
+      ...reviewFacts,
+      operatorActionCount: 0,
+      externalGateCount: 0,
+    },
+    conditions: {
+      repairable: [],
+      operatorActions: [],
+      externalGates: [],
+      waiting: ['Required CI and current review status require provider API authentication'],
+      ignored: [],
+    },
+  })
+  assert.equal(envelope.state, PRWardenState.ciUnknown)
+  assert.equal(envelope.decision.mayDispatchRepair, false)
+  assert.equal(envelope.gates.feedback, 'pending')
+  assert.ok(envelope.evidenceGaps.includes('Current review state unknown'))
 })
 
 test('scheduled GitHub watches perform a live read and fail closed', async () => {

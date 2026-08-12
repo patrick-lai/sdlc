@@ -210,8 +210,9 @@ export function gatesFrom(state, facts, opts = {}) {
   if (facts.hasConflicts === false) conflicts = 'done'
   else if (facts.hasConflicts === true) conflicts = lift('blocked')
 
-  const feedback =
-    facts.changesRequested || (facts.unresolvedTasks ?? 0) > 0
+  const feedback = facts.reviewStateKnown === false
+    ? 'pending'
+    : facts.changesRequested || (facts.unresolvedTasks ?? 0) > 0
       ? lift('blocked')
       : 'done'
 

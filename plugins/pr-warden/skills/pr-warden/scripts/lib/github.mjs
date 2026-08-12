@@ -37,13 +37,25 @@ export function githubConflictStatus(pr, lifecycle) {
   return null
 }
 
-export function githubCiState(combinedStatus, checkRuns = []) {
-  const checks = checkRuns ?? []
-  const hasSignals = Boolean(combinedStatus?.state) || checks.length > 0
-  if (!hasSignals) return 'unknown'
+export function githubCiState(combinedStatus, checkRuns = [], requiredCheckNames = null) {
+  if (!Array.isArray(requiredCheckNames)) return 'unknown'
+  if (requiredCheckNames.length === 0) return 'green'
 
-  const active = checks.some((check) => check?.status !== 'completed')
-  if (active || combinedStatus?.state === 'pending') return 'running'
+  const checks = checkRuns ?? []
+  const statuses = combinedStatus?.statuses ?? []
+  const required = requiredCheckNames.map((name) =>
+    checks.find((check) => check?.name === name) ??
+    statuses.find((status) => status?.context === name),
+  )
+  if (required.some((signal) => !signal)) return 'running'
+
+  const isCheckRun = (signal) => 'conclusion' in signal || 'status' in signal
+  const active = required.some((signal) =>
+    isCheckRun(signal)
+      ? signal.status !== 'completed'
+      : signal.state === 'pending',
+  )
+  if (active) return 'running'
 
   const failedConclusions = new Set([
     'failure',
@@ -52,21 +64,33 @@ export function githubCiState(combinedStatus, checkRuns = []) {
     'startup_failure',
   ])
   if (
-    combinedStatus?.state === 'failure' ||
-    combinedStatus?.state === 'error' ||
-    checks.some((check) => failedConclusions.has(check?.conclusion))
+    required.some((signal) =>
+      isCheckRun(signal)
+        ? failedConclusions.has(signal.conclusion)
+        : signal.state === 'failure' || signal.state === 'error',
+    )
   ) {
     return 'red'
   }
 
   const successfulConclusions = new Set(['success', 'neutral', 'skipped'])
-  const checksAreGreen = checks.every((check) =>
-    successfulConclusions.has(check?.conclusion),
+  const green = required.every((signal) =>
+    isCheckRun(signal)
+      ? successfulConclusions.has(signal.conclusion)
+      : signal.state === 'success',
   )
-  if (checksAreGreen && (checks.length > 0 || combinedStatus?.state === 'success')) {
-    return 'green'
+  return green ? 'green' : 'unknown'
+}
+
+export function unknownReviewFacts() {
+  return {
+    reviewStateKnown: false,
+    changesRequested: null,
+    approvalsSatisfied: null,
+    reviewCount: null,
+    approvedReviews: null,
+    changesRequestedReviews: null,
   }
-  return 'unknown'
 }
 
 export async function readScheduledWatch(watch, readGitHubSnapshot) {

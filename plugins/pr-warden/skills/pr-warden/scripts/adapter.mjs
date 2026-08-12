@@ -56,6 +56,7 @@ import {
   latestReviewStates,
   githubConflictStatus,
   githubCiState,
+  unknownReviewFacts,
   readScheduledWatch,
 } from './lib/github.mjs'
 
@@ -804,6 +805,12 @@ async function readGitHubApiSnapshot(link) {
   const ci = lifecycle === 'open'
     ? githubCiState(combinedStatus, checkRuns?.check_runs)
     : 'green'
+  const observedUnscopedFailure =
+    combinedStatus?.state === 'failure' ||
+    combinedStatus?.state === 'error' ||
+    (checkRuns?.check_runs ?? []).some((check) =>
+      ['failure', 'timed_out', 'action_required', 'startup_failure'].includes(check?.conclusion),
+    )
   const repairable = []
   if (ci === 'red') repairable.push('required CI is red')
   if (changesRequestedReviews > 0) repairable.push('review feedback requests changes')
@@ -820,8 +827,10 @@ async function readGitHubApiSnapshot(link) {
       lifecycle,
       isDraft: Boolean(pr.draft),
       ci,
+      requiredCiKnown: lifecycle !== 'open',
       hasConflicts: githubConflictStatus(pr, lifecycle),
       unresolvedTasks: 0,
+      reviewStateKnown: true,
       changesRequested: changesRequestedReviews > 0,
       approvalsSatisfied: approvedReviews > 0 ? true : null,
       operatorActionCount: 0,
@@ -835,7 +844,9 @@ async function readGitHubApiSnapshot(link) {
       operatorActions: [],
       externalGates: [],
       waiting,
-      ignored: [],
+      ignored: observedUnscopedFailure
+        ? ['Failing checks observed, but required-check scope is unknown']
+        : [],
     },
   }
 }
@@ -850,8 +861,6 @@ async function readGitHubHtmlSnapshot(link) {
   const pr = data?.payload?.pullRequestsLayoutRoute?.pullRequest
   if (!pr) throw new Error('GitHub public page metadata was incomplete')
   const lifecycle = pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'declined' : 'open'
-  const approvedReviews = (html.match(/approved these changes/gi) ?? []).length
-  const changesRequestedReviews = (html.match(/requested changes/gi) ?? []).length
   return {
     provider: 'github',
     key: link.key,
@@ -862,22 +871,21 @@ async function readGitHubHtmlSnapshot(link) {
       lifecycle,
       isDraft: pr.state === 'DRAFT',
       ci: 'unknown',
+      requiredCiKnown: lifecycle !== 'open',
       hasConflicts: lifecycle === 'open' ? null : false,
       unresolvedTasks: 0,
-      changesRequested: changesRequestedReviews > 0,
-      approvalsSatisfied: approvedReviews > 0 ? true : null,
+      ...unknownReviewFacts(),
       operatorActionCount: 0,
       externalGateCount: 0,
-      reviewCount: approvedReviews + changesRequestedReviews,
-      approvedReviews,
-      changesRequestedReviews,
       source: 'github-public-html',
     },
     conditions: {
-      repairable: changesRequestedReviews > 0 ? ['review feedback requests changes'] : [],
+      repairable: [],
       operatorActions: [],
       externalGates: [],
-      waiting: lifecycle === 'open' ? ['CI and full review status require provider API authentication'] : [],
+      waiting: lifecycle === 'open'
+        ? ['Required CI and current review status require provider API authentication']
+        : [],
       ignored: [],
     },
   }

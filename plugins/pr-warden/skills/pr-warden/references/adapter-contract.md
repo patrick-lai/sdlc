@@ -12,7 +12,7 @@ node scripts/adapter.mjs run --fixture <snapshot.json> --config <config.json>
 node scripts/adapter.mjs arm --url <github-pr-url>
 ```
 
-`inspect` reads public GitHub metadata and reviews, emits `sdlc.pr-warden.result/v1`, and never mutates the PR. `arm` and fixture-free `sweep` currently support GitHub watches; Bitbucket remains available through supplied snapshots or an authenticated provider connector, but the adapter rejects arming a Bitbucket watch until it has a live-read seam. Private repositories use provider credentials already configured for the agent. The skill stores no tokens.
+`inspect` reads public GitHub metadata and reviews, emits `sdlc.pr-warden.result/v1`, and never mutates the PR. GitHub check runs are not assumed to be branch-protection-required: without explicit required-check evidence, required CI remains unknown and observed failures are informational only. If REST access fails and public HTML is used, current review state also remains unknown rather than inferring it from stale page text. `arm` and fixture-free `sweep` currently support GitHub watches; Bitbucket remains available through supplied snapshots or an authenticated provider connector, but the adapter rejects arming a Bitbucket watch until it has a live-read seam. Private repositories use provider credentials already configured for the agent. The skill stores no tokens.
 
 Canonical keys are `github:owner/repo#number` and `bitbucket:workspace/repo#number`. Missing auth or evidence fails closed: low confidence, evidence gaps, and no actions.
 
