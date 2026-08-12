@@ -175,6 +175,53 @@ test('GitHub CI rollup acts only on identified required checks', () => {
   assert.equal(githubCiState(null, [], []), 'green')
 })
 
+test('GitHub CI rollup uses the latest rerun for each required check name', () => {
+  const staleFailureThenSuccess = [
+    {
+      id: 10,
+      name: 'build',
+      status: 'completed',
+      conclusion: 'failure',
+      started_at: '2026-03-01T10:00:00Z',
+      completed_at: '2026-03-01T10:05:00Z',
+    },
+    {
+      id: 20,
+      name: 'build',
+      status: 'completed',
+      conclusion: 'success',
+      started_at: '2026-03-01T10:10:00Z',
+      completed_at: '2026-03-01T10:15:00Z',
+    },
+  ]
+  assert.equal(githubCiState(null, staleFailureThenSuccess, ['build']), 'green')
+
+  const staleSuccessThenFailure = [
+    { id: 20, name: 'build', status: 'completed', conclusion: 'success' },
+    { id: 30, name: 'build', status: 'completed', conclusion: 'failure' },
+  ]
+  assert.equal(githubCiState(null, staleSuccessThenFailure, ['build']), 'red')
+
+  const completedThenNewRerun = [
+    {
+      id: 40,
+      name: 'build',
+      status: 'completed',
+      conclusion: 'success',
+      started_at: '2026-03-01T10:20:00Z',
+      completed_at: '2026-03-01T10:25:00Z',
+    },
+    {
+      id: 50,
+      name: 'build',
+      status: 'in_progress',
+      conclusion: null,
+      started_at: '2026-03-01T10:30:00Z',
+    },
+  ]
+  assert.equal(githubCiState(null, completedThenNewRerun, ['build']), 'running')
+})
+
 test('required-check config resolves global, repository map, and repository entry', () => {
   const key = { provider: 'github', workspace: 'Acme', repo: 'App', number: 9 }
   assert.deepEqual(

@@ -61,15 +61,47 @@ export function configuredRequiredChecks(config, key) {
   return normalizeRequiredChecks(repository?.requiredChecks)
 }
 
+function checkRunOrder(check) {
+  const timestamp = [check?.started_at, check?.completed_at, check?.created_at]
+    .map((value) => Date.parse(value ?? ''))
+    .find((value) => Number.isFinite(value))
+  const id = Number(check?.id)
+  return {
+    timestamp: Number.isFinite(timestamp) ? timestamp : null,
+    id: Number.isFinite(id) ? id : 0,
+  }
+}
+
+function isLaterCheckRun(candidate, current) {
+  const next = checkRunOrder(candidate)
+  const previous = checkRunOrder(current)
+  if (next.timestamp !== null && previous.timestamp !== null) {
+    if (next.timestamp !== previous.timestamp) return next.timestamp > previous.timestamp
+    return next.id > previous.id
+  }
+  if (next.timestamp !== null) return true
+  if (previous.timestamp !== null) return false
+  return next.id > previous.id
+}
+
+function latestCheckRunsByName(checkRuns) {
+  const latest = new Map()
+  for (const check of checkRuns ?? []) {
+    if (!check?.name) continue
+    const current = latest.get(check.name)
+    if (!current || isLaterCheckRun(check, current)) latest.set(check.name, check)
+  }
+  return latest
+}
+
 export function githubCiState(combinedStatus, checkRuns = [], requiredCheckNames = null) {
   if (!Array.isArray(requiredCheckNames)) return 'unknown'
   if (requiredCheckNames.length === 0) return 'green'
 
-  const checks = checkRuns ?? []
+  const checks = latestCheckRunsByName(checkRuns)
   const statuses = combinedStatus?.statuses ?? []
   const required = requiredCheckNames.map((name) =>
-    checks.find((check) => check?.name === name) ??
-    statuses.find((status) => status?.context === name),
+    checks.get(name) ?? statuses.find((status) => status?.context === name),
   )
   if (required.some((signal) => !signal)) return 'running'
 
