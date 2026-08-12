@@ -30,20 +30,29 @@ function tryResolveFrom(root, id) {
   }
 }
 
+/** Prefer full `playwright`; fall back to `playwright-core` when that is all that is installed. */
+function resolvePlaywrightId(root) {
+  if (tryResolveFrom(root, 'playwright')) return 'playwright'
+  if (tryResolveFrom(root, 'playwright-core')) return 'playwright-core'
+  return null
+}
+
 function ensureDeps() {
   const candidates = [FIXTURE_ROOT, process.cwd(), SKILL_ROOT]
   for (const root of candidates) {
-    if (
-      tryResolveFrom(root, 'testreel') &&
-      (tryResolveFrom(root, 'playwright') || tryResolveFrom(root, 'playwright-core'))
-    ) {
-      return { root, cleanup: false }
-    }
+    if (!tryResolveFrom(root, 'testreel')) continue
+    const playwrightId = resolvePlaywrightId(root)
+    if (playwrightId) return { root, cleanup: false, playwrightId }
   }
   try {
     requireHere.resolve('testreel')
-    requireHere.resolve('playwright')
-    return { root: __dirname, cleanup: false }
+    try {
+      requireHere.resolve('playwright')
+      return { root: __dirname, cleanup: false, playwrightId: 'playwright' }
+    } catch {
+      requireHere.resolve('playwright-core')
+      return { root: __dirname, cleanup: false, playwrightId: 'playwright-core' }
+    }
   } catch {
     // install scratch
   }
@@ -66,7 +75,7 @@ function ensureDeps() {
     env: process.env,
   })
   if (pw.status !== 0) throw new Error('npx playwright install chromium failed')
-  return { root: scratch, cleanup: true }
+  return { root: scratch, cleanup: true, playwrightId: 'playwright' }
 }
 
 function loadFrom(root, id) {
@@ -79,8 +88,8 @@ async function main() {
     throw new Error(`Missing caption helper at ${captionPath}`)
   }
 
-  const { root, cleanup } = ensureDeps()
-  const { chromium } = loadFrom(root, 'playwright')
+  const { root, cleanup, playwrightId } = ensureDeps()
+  const { chromium } = loadFrom(root, playwrightId)
   const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
   const { showCaption, updateCaption, hideCaption } = await import(pathToFileURL(captionPath).href)
 
