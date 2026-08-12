@@ -1,0 +1,28 @@
+{
+  "workspace": "acme",
+  "repo": "payments",
+  "number": 410100,
+  "title": "Ready green PR",
+  "url": "https://bitbucket.org/acme/payments/pull-requests/410100",
+  "branch": "feat/ready",
+  "jiraKeys": ["PAY-2000"],
+  "attemptCount": 0,
+  "facts": {
+    "lifecycle": "open",
+    "isDraft": false,
+    "ci": "green",
+    "hasConflicts": false,
+    "unresolvedTasks": 0,
+    "changesRequested": false,
+    "approvalsSatisfied": true,
+    "operatorActionCount": 0,
+    "externalGateCount": 0
+  },
+  "conditions": {
+    "repairable": [],
+    "operatorActions": [],
+    "externalGates": [],
+    "waiting": [],
+    "ignored": []
+  }
+}

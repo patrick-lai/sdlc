@@ -1,0 +1,32 @@
+{
+  "workspace": "acme",
+  "repo": "payments",
+  "number": 410074,
+  "title": "Fix checkout tax edge case",
+  "url": "https://bitbucket.org/acme/payments/pull-requests/410074",
+  "branch": "fix/tax-edge",
+  "sourceBranch": "fix/tax-edge",
+  "jiraKeys": ["PAY-1234"],
+  "attemptCount": 0,
+  "facts": {
+    "lifecycle": "open",
+    "isDraft": false,
+    "ci": "red",
+    "hasConflicts": false,
+    "unresolvedTasks": 0,
+    "changesRequested": false,
+    "approvalsSatisfied": false,
+    "operatorActionCount": 0,
+    "externalGateCount": 1
+  },
+  "conditions": {
+    "repairable": [
+      "Required check unit-tests failed on latest commit",
+      "1 new reviewer comments after the latest code revision"
+    ],
+    "operatorActions": [],
+    "externalGates": ["Approval required from code-owners"],
+    "waiting": [],
+    "ignored": ["optional coverage [opt] stopped"]
+  }
+}

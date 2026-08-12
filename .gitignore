@@ -48,3 +48,10 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+
+# PR Warden portable adapter ledger
+.pr-warden-ledger.json
+**/.pr-warden-ledger.json
+
+# PR Warden agent run state
+.pr-warden-state.json

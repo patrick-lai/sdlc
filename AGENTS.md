@@ -39,7 +39,7 @@ Claude Code plugin marketplace:
 /plugin install qa-demo@sdlc
 ```
 
-Canonical skill source in-repo: `skills/qa-demo/`. Plugin mirror: `plugins/qa-demo/skills/qa-demo/` (keep in sync after skill edits).
+Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`. Plugin mirrors under `plugins/` (keep in sync after skill edits).
 
 ## Repo map
 
@@ -48,11 +48,11 @@ Canonical skill source in-repo: `skills/qa-demo/`. Plugin mirror: `plugins/qa-de
 | `skills/` | Source of truth for `npx skills add` |
 | `plugins/` | Claude Code plugin packages |
 | `.claude-plugin/marketplace.json` | Marketplace catalog |
-| `fixtures/` | Local QA fixtures (e.g. dummy Java Task Board) — not required to install the skill |
+| `fixtures/` | Local QA fixtures (e.g. dummy Java Task Board, pr-warden snapshots) — not required to install the skill |
 
 ## Working rules
 
-1. Edit **`skills/qa-demo`** first; refresh the plugin mirror when the skill changes.
-2. Prefer **TestReel + caption helper** paths documented in the skill; do not invent a second caption system.
-3. Runtime deps (`testreel`, `playwright`, optional `ffmpeg`) are installed by runners/smoke — not vendored in the skill tree.
+1. Edit **`skills/<name>`** first; refresh the matching plugin mirror when the skill changes.
+2. For **qa-demo**: prefer **TestReel + caption helper** paths documented in the skill; do not invent a second caption system. Runtime deps (`testreel`, `playwright`, optional `ffmpeg`) are installed by runners/smoke — not vendored in the skill tree.
+3. For **pr-warden**: preserve Lumine/Raphael PR Warden behavior (`~/claude/raphael`); do not rebuild a second warden core. Policy/link pure ports live in `skills/pr-warden/scripts/lib/`. Never auto-merge. Code-change automation is PR-only + trusted paths. One skill tree only — no alternate source-of-truth under vendor dirs.
 4. Keep project skill installs on **`.agents/skills/`**; use **`.claude`** only for Claude-specific packaging or compatibility links.

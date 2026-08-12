@@ -1,0 +1,28 @@
+{
+  "workspace": "acme",
+  "repo": "payments",
+  "number": 410200,
+  "title": "Partial evidence PR",
+  "url": "https://bitbucket.org/acme/payments/pull-requests/410200",
+  "branch": "feat/partial",
+  "jiraKeys": [],
+  "attemptCount": 0,
+  "facts": {
+    "lifecycle": "open",
+    "isDraft": false,
+    "ci": "unknown",
+    "hasConflicts": null,
+    "unresolvedTasks": 0,
+    "changesRequested": false,
+    "approvalsSatisfied": null,
+    "operatorActionCount": 0,
+    "externalGateCount": 0
+  },
+  "conditions": {
+    "repairable": [],
+    "operatorActions": [],
+    "externalGates": [],
+    "waiting": [],
+    "ignored": []
+  }
+}

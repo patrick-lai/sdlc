@@ -5,8 +5,8 @@
     "url": "https://github.com/patrick-lai"
   },
   "metadata": {
-    "description": "SDLC agent skills for Claude Code — QA demos, TestReel walkthroughs, and more",
-    "version": "0.1.0",
+    "description": "SDLC agent skills for Claude Code — QA demos, portable PR Warden, and more",
+    "version": "0.2.0",
     "pluginRoot": "./plugins"
   },
   "plugins": [
@@ -39,6 +39,39 @@
       ],
       "skills": [
         "./skills/qa-demo"
+      ]
+    },
+    {
+      "name": "pr-warden",
+      "source": "./plugins/pr-warden",
+      "description": "Portable scheduled PR Warden: tend Bitbucket PRs with twg mechanical reads, policy classification, trusted-path repairs, and Bitbucket/Jira per-item actions. Never merges.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Patrick Lai",
+        "url": "https://github.com/patrick-lai"
+      },
+      "repository": "https://github.com/patrick-lai/sdlc",
+      "license": "MIT",
+      "keywords": [
+        "pr",
+        "bitbucket",
+        "jira",
+        "warden",
+        "review",
+        "scheduled",
+        "automation",
+        "twg"
+      ],
+      "category": "productivity",
+      "tags": [
+        "pr",
+        "bitbucket",
+        "jira",
+        "scheduled",
+        "review"
+      ],
+      "skills": [
+        "./skills/pr-warden"
       ]
     }
   ]

@@ -1,0 +1,12 @@
+{
+  "workspace": "acme",
+  "repo": "payments",
+  "number": 410300,
+  "title": "No access PR",
+  "url": "https://bitbucket.org/acme/payments/pull-requests/410300",
+  "permissionFailure": true,
+  "unreadable": true,
+  "error": "twg: permission denied (403) reading pull request",
+  "jiraKeys": ["PAY-9"],
+  "attemptCount": 0
+}

@@ -22,7 +22,10 @@
     "testreel",
     "storybook",
     "playwright",
-    "demo"
+    "demo",
+    "pr-warden",
+    "bitbucket",
+    "jira"
   ],
   "files": [
     "skills",
@@ -35,6 +38,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "smoke:testreel": "node skills/qa-demo/scripts/smoke-testreel.mjs"
+    "smoke:testreel": "node skills/qa-demo/scripts/smoke-testreel.mjs",
+    "test:pr-warden": "node skills/pr-warden/scripts/test-adapter.mjs",
+    "pr-warden": "node skills/pr-warden/scripts/adapter.mjs"
   }
 }

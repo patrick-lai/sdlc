@@ -1,0 +1,29 @@
+{
+  "ledgerPath": ".pr-warden-ledger.json",
+  "dryRun": true,
+  "checkIntervalMinutes": 15,
+  "maxAttempts": 3,
+  "codeChangeMode": "pr_only_trusted_paths",
+  "jiraBaseUrl": null,
+  "trustedPaths": [
+    "src/**",
+    "lib/**",
+    "packages/*/src/**",
+    "tests/**",
+    "docs/**",
+    "*.md"
+  ],
+  "actions": {
+    "bitbucket": true,
+    "jira": true
+  },
+  "repositories": [
+    {
+      "workspace": "acme",
+      "repo": "payments",
+      "number": 410074,
+      "title": "Example watched PR",
+      "jiraKeys": ["PAY-1234"]
+    }
+  ]
+}

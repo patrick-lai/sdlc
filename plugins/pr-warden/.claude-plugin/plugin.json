@@ -1,0 +1,21 @@
+{
+  "name": "pr-warden",
+  "description": "Portable scheduled PR Warden for Bitbucket: mechanical reads, policy classification, bounded trusted-path repairs, Atlassian-native per-item actions. Never merges.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "repository": "https://github.com/patrick-lai/sdlc",
+  "license": "MIT",
+  "keywords": [
+    "pr",
+    "bitbucket",
+    "jira",
+    "warden",
+    "review",
+    "scheduled",
+    "twg",
+    "sdlc"
+  ]
+}

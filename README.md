@@ -13,6 +13,7 @@ npx skills add patrick-lai/sdlc
 | Skill | What it does |
 |-------|----------------|
 | **qa-demo** | Open a target repo/PR, boot Storybook or the best available demo surface, prove the feature end-to-end, and record a polished narrated [TestReel](https://github.com/greentfrapp/testreel) video |
+| **pr-warden** | Keep open Bitbucket PRs healthy. Say `/pr-warden keep all my prs healthy` (or schedule that every 30m). **Never merges.** |
 
 ## Install
 
@@ -30,8 +31,9 @@ Most agents share **one** project install root: **`.agents/skills/`**.
 ```bash
 # Preferred: one project install (Codex + Cursor + Grok all see it)
 npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -y
+npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
 # equivalent project root for codex-only auto-detect:
-# npx skills add patrick-lai/sdlc --skill qa-demo -a codex -y
+# npx skills add patrick-lai/sdlc --skill pr-warden -a codex -y
 
 npx skills add patrick-lai/sdlc --list
 
@@ -52,6 +54,22 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 ```text
 /plugin marketplace add patrick-lai/sdlc
 /plugin install qa-demo@sdlc
+/plugin install pr-warden@sdlc
+```
+
+## pr-warden
+
+**That’s the product:**
+
+```text
+/pr-warden keep all my prs healthy
+```
+
+Schedule that prompt **every 30 minutes** in Claude/Codex/Cursor. Needs `twg` signed in. Never merges.
+
+```bash
+npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
+# Claude: /plugin install pr-warden@sdlc
 ```
 
 ## qa-demo
@@ -89,15 +107,17 @@ node skills/qa-demo/scripts/smoke-testreel.mjs
 
 ```text
 skills/qa-demo/                 # canonical skill (npx skills add)
+skills/pr-warden/               # canonical PR Warden pack + adapter
 plugins/qa-demo/                # Claude Code plugin package
-  skills/qa-demo/               # mirrored copy of the skill (keep in sync)
+plugins/pr-warden/              # Claude Code plugin package
 .claude-plugin/marketplace.json # marketplace catalog
 ```
 
-`skills/qa-demo` is the source of truth. After editing it, refresh the plugin mirror:
+Canonical skills live under `skills/`. After editing, refresh plugin mirrors:
 
 ```bash
 rm -rf plugins/qa-demo/skills/qa-demo && cp -a skills/qa-demo plugins/qa-demo/skills/qa-demo
+rm -rf plugins/pr-warden/skills/pr-warden && cp -a skills/pr-warden plugins/pr-warden/skills/pr-warden
 ```
 
 ## Links

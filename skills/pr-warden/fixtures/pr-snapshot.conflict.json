@@ -1,0 +1,28 @@
+{
+  "workspace": "acme",
+  "repo": "payments",
+  "number": 410400,
+  "title": "Conflicted branch",
+  "url": "https://bitbucket.org/acme/payments/pull-requests/410400",
+  "branch": "feat/conflict",
+  "jiraKeys": ["PAY-55"],
+  "attemptCount": 1,
+  "facts": {
+    "lifecycle": "open",
+    "isDraft": false,
+    "ci": "green",
+    "hasConflicts": true,
+    "unresolvedTasks": 0,
+    "changesRequested": false,
+    "approvalsSatisfied": null,
+    "operatorActionCount": 0,
+    "externalGateCount": 0
+  },
+  "conditions": {
+    "repairable": ["Source branch has merge conflicts with destination"],
+    "operatorActions": [],
+    "externalGates": [],
+    "waiting": [],
+    "ignored": []
+  }
+}

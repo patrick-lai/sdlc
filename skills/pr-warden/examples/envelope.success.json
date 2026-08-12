@@ -1,0 +1,38 @@
+{
+  "schema": "sdlc.pr-warden.result/v1",
+  "skill": "pr-warden",
+  "mode": "manual",
+  "idempotencyKey": "pr-warden:pr-warden:bitbucket:acme/payments#410074:dispatch_repair:abc123:2026-08-12",
+  "item": {
+    "provider": "bitbucket",
+    "key": "bitbucket:acme/payments#410074",
+    "url": "https://bitbucket.org/acme/payments/pull-requests/410074",
+    "jiraKeys": ["PAY-1234"]
+  },
+  "state": "ciRed",
+  "displayWord": "CI red",
+  "decision": {
+    "decision": "dispatch_repair",
+    "mayDispatchRepair": true,
+    "mayMerge": false
+  },
+  "policy": { "mayMerge": false, "codeChangeMode": "pr_only_trusted_paths" },
+  "confidence": 0.85,
+  "assumptions": [],
+  "evidenceGaps": [],
+  "actions": [
+    {
+      "surface": "bitbucket",
+      "kind": "repair_pass",
+      "status": "planned",
+      "evidenceUrl": "https://bitbucket.org/acme/payments/pull-requests/410074"
+    },
+    {
+      "surface": "jira",
+      "kind": "risk_note",
+      "status": "planned",
+      "itemKey": "PAY-1234",
+      "evidenceUrl": "https://jira.atlassian.com/browse/PAY-1234"
+    }
+  ]
+}
