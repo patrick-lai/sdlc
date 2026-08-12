@@ -38,7 +38,7 @@
         "e2e"
       ],
       "skills": [
-        "./plugins/qa-demo/skills/qa-demo"
+        "./skills/qa-demo"
       ]
     }
   ]

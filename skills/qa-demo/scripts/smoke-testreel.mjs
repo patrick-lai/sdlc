@@ -23,6 +23,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
+const requireHere = createRequire(import.meta.url)
+
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_URL = 'https://demo.playwright.dev/todomvc'
 const FALLBACK_URL = 'https://example.com'
@@ -33,19 +35,34 @@ function hasFfmpeg() {
   return r.status === 0
 }
 
+function tryResolveFrom(root, id) {
+  try {
+    createRequire(join(root, 'package.json')).resolve(id)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function ensureDeps() {
-  const require = createRequire(import.meta.url)
-  const tryResolve = (id) => {
-    try {
-      require.resolve(id)
-      return true
-    } catch {
-      return false
-    }
+  const localRoot = process.cwd()
+  if (
+    (tryResolveFrom(localRoot, 'testreel') || tryResolveFrom(__dirname, 'testreel')) &&
+    (tryResolveFrom(localRoot, 'playwright') ||
+      tryResolveFrom(localRoot, 'playwright-core') ||
+      tryResolveFrom(__dirname, 'playwright'))
+  ) {
+    const root = tryResolveFrom(localRoot, 'testreel') ? localRoot : __dirname
+    return { root, cleanup: false }
   }
 
-  if (tryResolve('testreel') && (tryResolve('playwright') || tryResolve('playwright-core'))) {
-    return { root: process.cwd(), cleanup: false }
+  // Also accept deps resolvable from this script's install location
+  try {
+    requireHere.resolve('testreel')
+    requireHere.resolve('playwright')
+    return { root: __dirname, cleanup: false }
+  } catch {
+    // install scratch copy below
   }
 
   // Install into a scratch directory so the skill repo stays clean
@@ -74,10 +91,8 @@ function ensureDeps() {
   return { root: scratch, cleanup: true }
 }
 
-async function importFrom(root, id) {
-  const require = createRequire(join(root, 'package.json'))
-  const resolved = require.resolve(id)
-  return import(pathToFileURL(resolved).href)
+function loadFrom(root, id) {
+  return createRequire(join(root, 'package.json'))(id)
 }
 
 async function urlReachable(url) {
@@ -96,13 +111,9 @@ async function main() {
     throw new Error(`Missing caption helper at ${captionPath}`)
   }
 
-  const [{ chromium }, testreel, captions] = await Promise.all([
-    importFrom(root, 'playwright'),
-    importFrom(root, 'testreel'),
-    import(pathToFileURL(captionPath).href),
-  ])
-
-  const { recordPage, hideCursor, showCursor } = testreel
+  const { chromium } = loadFrom(root, 'playwright')
+  const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
+  const captions = await import(pathToFileURL(captionPath).href)
   const { showCaption, updateCaption, hideCaption } = captions
 
   let url = process.env.SDLC_SMOKE_URL || DEFAULT_URL
