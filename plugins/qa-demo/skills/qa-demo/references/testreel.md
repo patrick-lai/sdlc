@@ -37,7 +37,7 @@ Formats: `.json`, `.jsonc`, `.yaml` / `.yml`.
   "cursor": { "style": "pointer" },
   "chrome": { "url": true },
   "background": {
-    "gradient": { "from": "#0f172a", "to": "#1e3a5f" },
+    "gradient": { "from": "#0052CC", "to": "#0747A6" },
     "padding": 48,
     "borderRadius": 12
   },
@@ -102,7 +102,7 @@ const recorder = await recordPage(page, {
   outputDir: './testreel-output',
   chrome: { url: true },
   background: {
-    gradient: { from: '#0f172a', to: '#1e3a5f' },
+    gradient: { from: '#0052CC', to: '#0747A6' },
     padding: 48,
     borderRadius: 12,
   },

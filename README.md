@@ -1,6 +1,6 @@
 # sdlc
 
-Public kit of **SDLC agent skills** for Claude Code, Codex, and the open [skills](https://skills.sh) ecosystem.
+Public kit of **SDLC agent skills** for Claude Code, Codex, Cursor, Grok Build, and the open [skills](https://skills.sh) ecosystem.
 
 Install:
 
@@ -16,12 +16,35 @@ npx skills add patrick-lai/sdlc
 
 ## Install
 
-### Agent Skills (Codex, Claude Code, Cursor, …)
+### Agent Skills (shared project path)
+
+Most agents share **one** project install root: **`.agents/skills/`**.
+
+| Agent | Project skills path | Notes |
+|-------|---------------------|--------|
+| **Codex** | `.agents/skills/` | skills CLI `-a codex` |
+| **Cursor** | `.agents/skills/` | skills CLI `-a cursor` |
+| **Grok Build** | reads `.agents/skills/` **and** `.grok/skills/` | Do **not** also pass `-a grok` for project install — that duplicates into `.grok/skills/` |
+| **Claude Code** | via plugin marketplace (below) and/or Agent Skills CLI | |
 
 ```bash
-npx skills add patrick-lai/sdlc
-npx skills add patrick-lai/sdlc --skill qa-demo
+# Preferred: one project install (Codex + Cursor + Grok all see it)
+npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -y
+# equivalent project root for codex-only auto-detect:
+# npx skills add patrick-lai/sdlc --skill qa-demo -a codex -y
+
 npx skills add patrick-lai/sdlc --list
+
+# Global (per-agent homes differ — only use when you need user-wide install)
+npx skills add patrick-lai/sdlc --skill qa-demo -g -a cursor -y   # → ~/.cursor/skills
+# Codex global: ~/.codex/skills  |  Grok global: ~/.grok/skills
+```
+
+Avoid:
+
+```bash
+# ❌ duplicates the same skill under .agents/skills and .grok/skills
+npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 ```
 
 ### Claude Code plugin marketplace

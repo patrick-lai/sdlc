@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task Board — Java Dummy</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app" data-testid="task-board-app">
+      <header class="header">
+        <p class="eyebrow">com.example.taskboard</p>
+        <h1>Task Board</h1>
+        <p class="subtitle">Dummy Java domain + local preview for qa-demo</p>
+      </header>
+
+      <section class="composer" aria-label="Add task">
+        <label class="field">
+          <span>Title</span>
+          <input
+            id="task-title"
+            data-testid="task-title"
+            type="text"
+            placeholder="Ship qa-demo proof"
+            autocomplete="off"
+          />
+        </label>
+        <label class="field">
+          <span>Priority</span>
+          <select id="task-priority" data-testid="task-priority">
+            <option value="LOW">Low</option>
+            <option value="MEDIUM" selected>Medium</option>
+            <option value="HIGH">High</option>
+          </select>
+        </label>
+        <button type="button" id="add-task" data-testid="add-task" class="primary">
+          Add task
+        </button>
+      </section>
+
+      <p id="form-error" class="error" data-testid="form-error" hidden>
+        Title is required
+      </p>
+
+      <nav class="filters" aria-label="Filter tasks">
+        <button type="button" class="filter is-active" data-filter="ALL" data-testid="filter-all">
+          All
+        </button>
+        <button type="button" class="filter" data-filter="ACTIVE" data-testid="filter-active">
+          Active
+        </button>
+        <button
+          type="button"
+          class="filter"
+          data-filter="COMPLETED"
+          data-testid="filter-completed"
+        >
+          Completed
+        </button>
+      </nav>
+
+      <ul id="task-list" class="task-list" data-testid="task-list"></ul>
+      <p id="empty-state" class="empty" data-testid="empty-state">No tasks yet. Add one above.</p>
+      <p id="status" class="status" data-testid="status" aria-live="polite">0 tasks</p>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

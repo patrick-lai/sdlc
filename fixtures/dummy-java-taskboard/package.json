@@ -1,0 +1,10 @@
+{
+  "name": "qa-demo-dummy-java",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dummy Java + static UI fixture for qa-demo skill proof",
+  "scripts": {
+    "start": "python3 -m http.server 8877 --directory public",
+    "dev": "python3 -m http.server 8877 --directory public"
+  }
+}
