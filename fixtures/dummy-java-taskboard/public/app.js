@@ -68,14 +68,16 @@ function render() {
     li.innerHTML = `
       <input class="toggle" type="checkbox" data-testid="toggle-${task.id}" ${
         task.completed ? 'checked' : ''
-      } aria-label="Complete ${task.title}" />
+      } />
       <div>
         <div class="title" data-testid="task-title-${task.id}">${escapeHtml(task.title)}</div>
         <div class="meta">id ${task.id}</div>
       </div>
       <span class="badge ${task.priority}" data-testid="priority-${task.id}">${task.priority}</span>
     `
-    li.querySelector('.toggle').addEventListener('change', () => completeTask(task.id))
+    const toggle = li.querySelector('.toggle')
+    toggle.setAttribute('aria-label', `Complete ${task.title}`)
+    toggle.addEventListener('change', () => completeTask(task.id))
     els.list.appendChild(li)
   }
 

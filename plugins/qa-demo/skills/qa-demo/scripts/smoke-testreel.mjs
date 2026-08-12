@@ -44,23 +44,30 @@ function tryResolveFrom(root, id) {
   }
 }
 
+/** Prefer full `playwright`; fall back to `playwright-core` when that is all that is installed. */
+function resolvePlaywrightId(root) {
+  if (tryResolveFrom(root, 'playwright')) return 'playwright'
+  if (tryResolveFrom(root, 'playwright-core')) return 'playwright-core'
+  return null
+}
+
 function ensureDeps() {
-  const localRoot = process.cwd()
-  if (
-    (tryResolveFrom(localRoot, 'testreel') || tryResolveFrom(__dirname, 'testreel')) &&
-    (tryResolveFrom(localRoot, 'playwright') ||
-      tryResolveFrom(localRoot, 'playwright-core') ||
-      tryResolveFrom(__dirname, 'playwright'))
-  ) {
-    const root = tryResolveFrom(localRoot, 'testreel') ? localRoot : __dirname
-    return { root, cleanup: false }
+  for (const root of [process.cwd(), __dirname]) {
+    if (!tryResolveFrom(root, 'testreel')) continue
+    const playwrightId = resolvePlaywrightId(root)
+    if (playwrightId) return { root, cleanup: false, playwrightId }
   }
 
   // Also accept deps resolvable from this script's install location
   try {
     requireHere.resolve('testreel')
-    requireHere.resolve('playwright')
-    return { root: __dirname, cleanup: false }
+    try {
+      requireHere.resolve('playwright')
+      return { root: __dirname, cleanup: false, playwrightId: 'playwright' }
+    } catch {
+      requireHere.resolve('playwright-core')
+      return { root: __dirname, cleanup: false, playwrightId: 'playwright-core' }
+    }
   } catch {
     // install scratch copy below
   }
@@ -88,7 +95,7 @@ function ensureDeps() {
   if (pw.status !== 0) {
     throw new Error('npx playwright install chromium failed')
   }
-  return { root: scratch, cleanup: true }
+  return { root: scratch, cleanup: true, playwrightId: 'playwright' }
 }
 
 function loadFrom(root, id) {
@@ -105,53 +112,56 @@ async function urlReachable(url) {
 }
 
 async function main() {
-  const { root, cleanup } = ensureDeps()
   const captionPath = join(__dirname, 'caption-overlay.mjs')
   if (!existsSync(captionPath)) {
     throw new Error(`Missing caption helper at ${captionPath}`)
   }
 
-  const { chromium } = loadFrom(root, 'playwright')
-  const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
-  const captions = await import(pathToFileURL(captionPath).href)
-  const { showCaption, updateCaption, hideCaption } = captions
-
-  let url = process.env.SDLC_SMOKE_URL || DEFAULT_URL
-  const useTodoMvc = !process.env.SDLC_SMOKE_URL && (await urlReachable(DEFAULT_URL))
-  if (!process.env.SDLC_SMOKE_URL && !useTodoMvc) {
-    console.warn(`[smoke] ${DEFAULT_URL} unreachable; falling back to ${FALLBACK_URL}`)
-    url = FALLBACK_URL
-  }
-
-  const format = hasFfmpeg() ? 'mp4' : 'webm'
-  console.log(`[smoke] Recording narrated demo → ${url}`)
-  console.log(`[smoke] Output: ${OUT_DIR} (${format})`)
-
-  const browser = await chromium.launch()
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 720 },
-    recordVideo: {
-      dir: OUT_DIR,
-      size: { width: 1280, height: 720 },
-    },
-  })
-  const page = await context.newPage()
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-
-  const recorder = await recordPage(page, {
-    outputDir: OUT_DIR,
-    chrome: { url: true },
-    cursor: { style: 'pointer', size: 48 },
-    background: {
-      gradient: { from: '#0052CC', to: '#0747A6' },
-      padding: 48,
-      borderRadius: 12,
-    },
-    outputFormat: format,
-    clean: true,
-  })
+  const { root, cleanup, playwrightId } = ensureDeps()
+  let browser
+  let recorder
 
   try {
+    const { chromium } = loadFrom(root, playwrightId)
+    const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
+    const captions = await import(pathToFileURL(captionPath).href)
+    const { showCaption, updateCaption, hideCaption } = captions
+
+    let url = process.env.SDLC_SMOKE_URL || DEFAULT_URL
+    const useTodoMvc = !process.env.SDLC_SMOKE_URL && (await urlReachable(DEFAULT_URL))
+    if (!process.env.SDLC_SMOKE_URL && !useTodoMvc) {
+      console.warn(`[smoke] ${DEFAULT_URL} unreachable; falling back to ${FALLBACK_URL}`)
+      url = FALLBACK_URL
+    }
+
+    const format = hasFfmpeg() ? 'mp4' : 'webm'
+    console.log(`[smoke] Recording narrated demo → ${url}`)
+    console.log(`[smoke] Output: ${OUT_DIR} (${format})`)
+
+    browser = await chromium.launch()
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      recordVideo: {
+        dir: OUT_DIR,
+        size: { width: 1280, height: 720 },
+      },
+    })
+    const page = await context.newPage()
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+
+    recorder = await recordPage(page, {
+      outputDir: OUT_DIR,
+      chrome: { url: true },
+      cursor: { style: 'pointer', size: 48 },
+      background: {
+        gradient: { from: '#0052CC', to: '#0747A6' },
+        padding: 48,
+        borderRadius: 12,
+      },
+      outputFormat: format,
+      clean: true,
+    })
+
     await showCaption(page, 'QA Demo smoke — TestReel + captions')
     await hideCursor(page)
     await page.waitForTimeout(1800)
@@ -199,13 +209,13 @@ async function main() {
   } catch (err) {
     console.error('[smoke] FAIL — keeping partial output if any')
     try {
-      await recorder.stop()
+      await recorder?.stop()
     } catch {
       // ignore double-stop / finalize errors
     }
     throw err
   } finally {
-    await browser.close().catch(() => {})
+    if (browser) await browser.close().catch(() => {})
     if (cleanup) {
       rmSync(root, { recursive: true, force: true })
     }
