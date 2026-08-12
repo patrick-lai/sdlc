@@ -1,0 +1,207 @@
+#!/usr/bin/env node
+/**
+ * Self-contained smoke: prove TestReel + caption overlays work.
+ *
+ * Records a short narrated demo against Playwright's public TodoMVC demo
+ * (falls back to example.com if TodoMVC is unreachable).
+ *
+ * Run from repo root:
+ *   npm run smoke:testreel
+ *
+ * Or from this directory (after installing deps into a scratch folder):
+ *   node scripts/smoke-testreel.mjs
+ *
+ * Env:
+ *   SDLC_SMOKE_URL   Override target URL
+ *   SDLC_SMOKE_OUT   Output directory (default: ./testreel-output/smoke)
+ */
+
+import { createRequire } from 'node:module'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const DEFAULT_URL = 'https://demo.playwright.dev/todomvc'
+const FALLBACK_URL = 'https://example.com'
+const OUT_DIR = resolve(process.env.SDLC_SMOKE_OUT || join(process.cwd(), 'testreel-output', 'smoke'))
+
+function hasFfmpeg() {
+  const r = spawnSync('ffmpeg', ['-version'], { encoding: 'utf8' })
+  return r.status === 0
+}
+
+function ensureDeps() {
+  const require = createRequire(import.meta.url)
+  const tryResolve = (id) => {
+    try {
+      require.resolve(id)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  if (tryResolve('testreel') && (tryResolve('playwright') || tryResolve('playwright-core'))) {
+    return { root: process.cwd(), cleanup: false }
+  }
+
+  // Install into a scratch directory so the skill repo stays clean
+  const scratch = mkdtempSync(join(tmpdir(), 'sdlc-testreel-smoke-'))
+  writeFileSync(
+    join(scratch, 'package.json'),
+    JSON.stringify({ name: 'sdlc-testreel-smoke', private: true, type: 'module' }, null, 2),
+  )
+  console.log(`[smoke] Installing testreel + playwright into ${scratch}`)
+  const install = spawnSync('npm', ['install', 'testreel', 'playwright', '--no-fund', '--no-audit'], {
+    cwd: scratch,
+    stdio: 'inherit',
+    env: process.env,
+  })
+  if (install.status !== 0) {
+    throw new Error('npm install testreel playwright failed')
+  }
+  const pw = spawnSync('npx', ['playwright', 'install', 'chromium'], {
+    cwd: scratch,
+    stdio: 'inherit',
+    env: process.env,
+  })
+  if (pw.status !== 0) {
+    throw new Error('npx playwright install chromium failed')
+  }
+  return { root: scratch, cleanup: true }
+}
+
+async function importFrom(root, id) {
+  const require = createRequire(join(root, 'package.json'))
+  const resolved = require.resolve(id)
+  return import(pathToFileURL(resolved).href)
+}
+
+async function urlReachable(url) {
+  try {
+    const res = await fetch(url, { method: 'GET', redirect: 'follow' })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+async function main() {
+  const { root, cleanup } = ensureDeps()
+  const captionPath = join(__dirname, 'caption-overlay.mjs')
+  if (!existsSync(captionPath)) {
+    throw new Error(`Missing caption helper at ${captionPath}`)
+  }
+
+  const [{ chromium }, testreel, captions] = await Promise.all([
+    importFrom(root, 'playwright'),
+    importFrom(root, 'testreel'),
+    import(pathToFileURL(captionPath).href),
+  ])
+
+  const { recordPage, hideCursor, showCursor } = testreel
+  const { showCaption, updateCaption, hideCaption } = captions
+
+  let url = process.env.SDLC_SMOKE_URL || DEFAULT_URL
+  const useTodoMvc = !process.env.SDLC_SMOKE_URL && (await urlReachable(DEFAULT_URL))
+  if (!process.env.SDLC_SMOKE_URL && !useTodoMvc) {
+    console.warn(`[smoke] ${DEFAULT_URL} unreachable; falling back to ${FALLBACK_URL}`)
+    url = FALLBACK_URL
+  }
+
+  const format = hasFfmpeg() ? 'mp4' : 'webm'
+  console.log(`[smoke] Recording narrated demo → ${url}`)
+  console.log(`[smoke] Output: ${OUT_DIR} (${format})`)
+
+  const browser = await chromium.launch()
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 720 },
+    recordVideo: {
+      dir: OUT_DIR,
+      size: { width: 1280, height: 720 },
+    },
+  })
+  const page = await context.newPage()
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+
+  const recorder = await recordPage(page, {
+    outputDir: OUT_DIR,
+    chrome: { url: true },
+    cursor: { style: 'pointer', size: 48 },
+    background: {
+      gradient: { from: '#0f172a', to: '#1e3a5f' },
+      padding: 48,
+      borderRadius: 12,
+    },
+    outputFormat: format,
+    clean: true,
+  })
+
+  try {
+    await showCaption(page, 'QA Demo smoke — TestReel + captions')
+    await hideCursor(page)
+    await page.waitForTimeout(1800)
+    await showCursor(page)
+
+    if (useTodoMvc || url.includes('todomvc')) {
+      await updateCaption(page, 'Adding a todo item')
+      await recorder.type('.new-todo', 'Ship qa-demo skill', { delay: 40 })
+      await recorder.keyboard('Enter')
+      await page.waitForTimeout(600)
+
+      await updateCaption(page, 'Marking the todo complete')
+      await recorder.click('.todo-list li:first-child .toggle', { zoom: 2 })
+      await page.waitForTimeout(500)
+
+      await showCaption(page, 'Verifying completed state')
+      await hideCursor(page)
+      await recorder.zoom({ selector: '.todo-list', scale: 1.8, duration: 700 })
+      await page.waitForTimeout(1600)
+      await recorder.zoom({ scale: 1, duration: 500 })
+      await showCursor(page)
+
+      const completed = page.locator('.todo-list li.completed')
+      await completed.waitFor({ state: 'visible', timeout: 5000 })
+    } else {
+      await updateCaption(page, 'Checking the Example Domain heading')
+      await hideCursor(page)
+      await page.waitForTimeout(1200)
+      await showCursor(page)
+      await page.getByRole('heading', { name: /example domain/i }).waitFor({ state: 'visible' })
+      await recorder.screenshot('example-heading')
+    }
+
+    await showCaption(page, 'Result: TestReel smoke passed')
+    await hideCursor(page)
+    await page.waitForTimeout(1800)
+    await hideCaption(page)
+
+    const result = await recorder.stop()
+    console.log('[smoke] PASS')
+    console.log(`[smoke] Video: ${result.video}`)
+    if (result.screenshots?.length) {
+      console.log(`[smoke] Screenshots: ${result.screenshots.join(', ')}`)
+    }
+  } catch (err) {
+    console.error('[smoke] FAIL — keeping partial output if any')
+    try {
+      await recorder.stop()
+    } catch {
+      // ignore double-stop / finalize errors
+    }
+    throw err
+  } finally {
+    await browser.close().catch(() => {})
+    if (cleanup) {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+}
+
+main().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

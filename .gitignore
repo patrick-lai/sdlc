@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# TestReel / recording output
+testreel-output/
+**/testreel-output/
+*.webm
+*.mp4
+!docs/**/*.mp4
+recording-*.json
+!skills/**/references/**
+
+# Build / caches
+dist/
+build/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Agent install artifacts (local)
+.agents/
+skills-lock.json
+.skills.json
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
