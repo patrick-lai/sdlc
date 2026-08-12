@@ -23,7 +23,7 @@ export function loadLedger(filePath) {
     }
   } catch (err) {
     if (err && err.code === 'ENOENT') return emptyLedger()
-    // Corrupt ledger → empty (matches Lumine: never crash the loop)
+    // Corrupt ledger → empty so one bad local file never crashes the sweep.
     return emptyLedger()
   }
 }

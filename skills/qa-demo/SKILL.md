@@ -32,15 +32,24 @@ Collect (ask only for what is missing):
 
 | Input | Examples |
 |-------|----------|
-| **Target** | Local path, git URL, or PR URL (`https://github.com/org/repo/pull/123`) |
+| **Target** | Local path, git URL, or GitHub/Bitbucket-style PR URL |
 | **What to prove** | PR title/body, feature description, acceptance criteria |
 | **Preferred surface** (optional) | Storybook / Playwright / Cypress / app URL |
 
 If given a PR URL:
 
-1. Fetch PR metadata + changed files (`gh pr view`, `gh pr diff`, or GitHub API).
-2. Checkout the PR head locally when needed (`gh pr checkout <n>`).
-3. Map changed files → likely UI entry points (components, routes, stories, e2e specs).
+1. Fetch metadata, description, review context, and changed files with the available provider CLI/API. Do not require a specific company tool.
+2. Identify base and source revisions. Checkout the source branch only when the current workspace is not already on it; preserve unrelated work.
+3. Map acceptance criteria and changed files to likely UI entry points (components, routes, stories, e2e specs).
+4. Treat links to an older demo as context, not proof for the current revision.
+
+### 1b. Decide whether a visual demo applies
+
+Before installing or booting anything, classify the change:
+
+- **Visual:** user-facing component, route, interaction, state, or rendered documentation changed → continue.
+- **Mixed:** UI plus backend/config changes → record the UI slice this reel proves and list the rest as residual risk.
+- **Non-visual:** backend protocol, build tooling, data migration, or config-only change with no truthful browser-visible behavior → stop cleanly with `NOT_APPLICABLE`. Name the inspected files and recommend the appropriate unit/integration/API proof. Do not invent a mock UI just to produce a video.
 
 ### 2. Discover boot path
 
@@ -51,16 +60,19 @@ Inspect the target repo. Read `package.json` (and workspace roots), README, CI c
 3. **Local app preview** — `dev` / `start` / `preview` (Vite, Next, etc.)
 4. **Static docs site** — Docusaurus, VitePress, etc.
 
-Also check: `docker-compose*`, Turborepo/Nx/pnpm workspaces, monorepo package that owns the UI change.
+Also check: `docker-compose*`, Turborepo/Nx/pnpm workspaces, and the manifest/build metadata that identifies the package owning the UI change. In a monorepo, use package-scoped scripts rather than booting or installing the entire repository when possible.
 
-**Write down** the chosen path and why (1–3 sentences). See [references/boot-detection.md](references/boot-detection.md).
+**Write down** the chosen path, owning package, command, and why (1–3 sentences). See [references/boot-detection.md](references/boot-detection.md).
 
 ### 3. Boot
 
-1. Install deps if `node_modules` is missing (`npm` / `pnpm` / `yarn` / `bun` — match the lockfile).
-2. Start the chosen surface in the background.
-3. Wait until healthy (HTTP 200 on the expected URL/port, or Storybook “Local:” URL in logs).
+1. Install target-repo dependencies only when required (`npm` / `pnpm` / `yarn` / `bun` — match the lockfile). Never rewrite its lockfile merely to add TestReel; install recording dependencies in a temporary scratch directory when the repo does not already own them.
+2. Start the chosen surface in the background and capture its PID/log path.
+3. Wait until healthy (HTTP 200 on the expected URL/port, or Storybook “Local:” URL in logs) with a bounded timeout.
 4. Capture **base URL** (e.g. `http://localhost:6006`, `http://localhost:3000`).
+5. Register cleanup before recording: stop only the server/browser processes you started. Preserve logs and partial artifacts on failure.
+
+For authenticated apps, use an existing repository-approved test account or Playwright `storageState`. Complete login before recording; never place passwords, tokens, cookies, SSO screens, or 2FA prompts in captions, logs, screenshots, or video. If operator login is required, pause for it and begin the reel only after the authenticated landing page is ready.
 
 Common defaults:
 
@@ -145,12 +157,15 @@ Caption element id is always `__sdlc_caption`. Position: bottom-left lower-third
 
 ### 6. Record with TestReel
 
-1. Ensure `testreel` + Playwright are available (scratch dir or project):
+1. Ensure `testreel` + Playwright are available. Prefer a temporary scratch directory unless the target repo already declares them, so QA does not dirty the target manifest or lockfile:
 
    ```bash
-   npm install testreel playwright
-   npx playwright install chromium
+   scratch=$(mktemp -d)
+   npm install --prefix "$scratch" testreel playwright
+   npm exec --prefix "$scratch" -- playwright install chromium
    ```
+
+   If browser installation is blocked, report the exact command and failure; do not claim the feature failed. If `ffmpeg` is absent, record WebM rather than installing system packages without permission.
 
 2. Prefer a **Node runner** with `recordPage` so you can `page.evaluate` captions between steps. Example shape:
 
@@ -221,11 +236,15 @@ Assert critical UI states with Playwright expects / visible selectors (in the ru
 - Happy-path outcome is on screen (toast, list item, enabled button, URL change)
 - Edge/proof moment behaves as claimed
 
-If recording fails mid-way:
+Result rules:
 
-- Keep partial output under `testreel-output/`
-- Report which step failed and what was already proven
-- Do not claim full pass
+- **PASS:** every planned critical assertion passed, the video finalized, and the named artifact paths exist from this run.
+- **PARTIAL:** at least one meaningful claim passed, but a later assertion, recording finalization, auth boundary, or non-critical surface failed.
+- **FAIL:** the target surface booted but no core acceptance claim held, or the exercised behavior contradicted the requirement.
+- **NOT_APPLICABLE:** the inspected change has no truthful browser-visible behavior. No video is required.
+- **BLOCKED** is not a feature verdict: use it only when tooling, credentials, dependencies, or startup prevented testing.
+
+If recording fails mid-way, keep partial output under `testreel-output/`, report which step failed and what was already proven, and never promote an older artifact to current proof. Record the tested revision and fresh artifact timestamps in the report.
 
 ### 8. Deliver
 
@@ -241,8 +260,9 @@ Hand back:
 - **Target:** …
 - **What we proved:** …
 - **Boot method:** Storybook @ http://localhost:6006 (why: …)
-- **Result:** PASS | FAIL | PARTIAL
+- **Result:** PASS | PARTIAL | FAIL | NOT_APPLICABLE | BLOCKED
 - **Artifacts:** `testreel-output/….mp4`, screenshots…
+- **Revision:** tested commit/source revision
 - **Residual risks:** …
 ```
 

@@ -13,7 +13,7 @@ npx skills add patrick-lai/sdlc
 | Skill | What it does |
 |-------|----------------|
 | **qa-demo** | Open a target repo/PR, boot Storybook or the best available demo surface, prove the feature end-to-end, and record a polished narrated [TestReel](https://github.com/greentfrapp/testreel) video |
-| **pr-warden** | Keep open Bitbucket PRs healthy. Say `/pr-warden keep all my prs healthy` (or schedule that every 30m). **Never merges.** |
+| **pr-warden** | Keep GitHub or Bitbucket PRs healthy with provider-neutral reads, bounded trusted-path repairs, and a permanent **never merge** rule. |
 
 ## Install
 
@@ -59,23 +59,31 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 
 ## pr-warden
 
-**That’s the product:**
-
-```text
-/pr-warden keep all my prs healthy
-```
-
-Schedule that prompt **every 30 minutes** in Claude/Codex/Cursor. Needs `twg` signed in. Never merges.
-
-The operator sheet is a baked HTML template (not agent-authored markup):
-
-```bash
-npm run pr-warden -- digest --fixture-dir skills/pr-warden/fixtures --html .pr-warden-report.html
-```
+Install it, then ask the agent to watch all open PRs or one URL:
 
 ```bash
 npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
-# Claude: /plugin install pr-warden@sdlc
+```
+
+```text
+/pr-warden keep all my prs healthy
+/pr-warden babysit https://github.com/OWNER/REPO/pull/123
+```
+
+It supports GitHub and Bitbucket, never merges or approves, changes only the PR source branch and trusted paths, and stops after three unsuccessful automatic repairs. Private repositories use provider credentials already configured for the agent. A baked `--html` operator sheet groups actionable, waiting, ready, and settled PRs without agent-authored markup. Public GitHub PRs have a credential-free read-only proof path:
+
+```bash
+node .agents/skills/pr-warden/scripts/adapter.mjs inspect \
+  --url https://github.com/patrick-lai/sdlc/pull/2
+```
+
+Repository checks:
+
+```bash
+npm run smoke:install       # temp-project install of both skills
+npm run test:pr-warden      # policy, providers, ledger, trusted paths
+npm run test:skills          # public-safe content + canonical/plugin parity
+npm run smoke:testreel      # fresh captioned qa-demo recording
 ```
 
 ## qa-demo
@@ -92,7 +100,7 @@ The skill will:
 2. Plan a viewer-facing walkthrough (happy path + proof moments)
 3. Inject **on-screen caption overlays** (TestReel has no built-in captions)
 4. Record with TestReel (MP4 if `ffmpeg` is available, else WebM)
-5. Deliver video path + a short QA report
+5. Deliver video path + a truthful PASS/PARTIAL/FAIL report, or stop as NOT_APPLICABLE for non-visual changes
 
 Helper scripts live under `skills/qa-demo/scripts/`:
 

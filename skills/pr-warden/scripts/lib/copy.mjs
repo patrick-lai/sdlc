@@ -1,5 +1,5 @@
 /**
- * Operator-facing copy for PR Warden reports (HTML + Bitbucket/Jira markdown).
+ * Operator-facing copy for PR Warden reports (HTML + provider-neutral markdown).
  * One home — do not restate these sentences in SKILL.md or the HTML template.
  */
 
@@ -24,7 +24,7 @@ export const BANDS = Object.freeze({
   ready: {
     id: 'ready',
     title: 'Ready to merge',
-    helper: 'Gates are clear. You merge in Bitbucket. Warden never will.',
+    helper: 'Gates are clear. You merge in your provider. Warden never will.',
   },
   settled: {
     id: 'settled',
@@ -43,7 +43,7 @@ const STATE_HELPER = Object.freeze({
   needsYou:
     'Automatic repair cannot proceed. Approval, draft, exhausted attempts, or an out-of-policy path sits with you.',
   readyToMerge:
-    'Mechanical gates are clear. Merge in Bitbucket when you want it landed — Warden will not press merge.',
+    'Mechanical gates are clear. Merge in your provider when you want it landed — Warden will not press merge.',
   ciRunning:
     'Checks are still running. Warden waits and will not spend a repair attempt on a moving build.',
   ciUnknown:
@@ -53,7 +53,7 @@ const STATE_HELPER = Object.freeze({
   draft:
     'Draft PRs are operator-owned. Mark ready yourself; Warden will not.',
   unreadable:
-    'The PR could not be read (auth or network). No mutations. Sign in to twg and retry.',
+    'The PR could not be read (auth or network). No mutations. Authenticate the provider CLI/API and retry.',
   unknown: 'Not classified yet. The next tick will attempt a mechanical read.',
   merged: 'Already merged. Warden has nothing left to do.',
   closed: 'PR is declined or closed. Warden stops.',
@@ -72,7 +72,7 @@ export function operatorHelper(envelope = {}) {
   const confidence = envelope.confidence
 
   if (envelope.permissionFailure || confidence === 0.15) {
-    return 'Auth or permission failed reading this PR. No mutations. Sign in to twg and retry.'
+    return 'Auth or permission failed reading this PR. No mutations. Authenticate the provider CLI/API and retry.'
   }
   if (decision === 'escalate_exhausted') {
     return 'Automatic attempts exhausted — your turn. Warden will not push again until new human activity changes the picture.'

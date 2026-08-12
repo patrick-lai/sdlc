@@ -1,5 +1,5 @@
 /**
- * Atlassian-native, auditable result envelope.
+ * Provider-neutral, auditable result envelope.
  * Facts are separated from decisions. Every result exposes confidence,
  * provenance, assumptions, and evidence gaps.
  */
@@ -64,9 +64,17 @@ export function buildResultEnvelope(input = {}) {
     evidenceGaps.push('No mechanical PR facts available for this run')
     assumptions.push('Proceeding with best-effort classification from partial context')
   } else {
-    if (facts.ci === 'unknown') evidenceGaps.push('CI status unknown')
+    if (facts.ci === 'unknown') {
+      evidenceGaps.push(
+        facts.requiredCiKnown === false
+          ? 'Required CI status unknown'
+          : 'CI status unknown',
+      )
+    }
     if (facts.hasConflicts == null) evidenceGaps.push('Conflict status not probed')
-    if (facts.approvalsSatisfied == null) {
+    if (facts.reviewStateKnown === false) {
+      evidenceGaps.push('Current review state unknown')
+    } else if (facts.approvalsSatisfied == null) {
       assumptions.push('No approval merge-check detected; gateless-green rules may apply')
     }
   }
@@ -93,7 +101,7 @@ export function buildResultEnvelope(input = {}) {
     generatedAt: now.toISOString(),
     idempotencyKey,
     item: {
-      provider: 'bitbucket',
+      provider: key?.provider ?? 'bitbucket',
       key: key ? keyDescription(key) : null,
       workspace: key?.workspace ?? null,
       repo: key?.repo ?? null,
@@ -125,7 +133,7 @@ export function buildResultEnvelope(input = {}) {
     provenance: input.provenance ?? [
       {
         source: 'mechanical-read',
-        tool: input.tool ?? 'twg bitbucket pull-requests get --full',
+        tool: input.tool ?? 'provider API or supplied snapshot',
         at: now.toISOString(),
       },
     ],
@@ -154,10 +162,10 @@ export function computeConfidence({ state, facts, evidenceGaps, permissionFailur
 }
 
 /**
- * Compact Atlassian-native markdown for Bitbucket comment / Jira comment bodies.
+ * Compact provider-neutral markdown for pull-request status reports.
  * @param {object} envelope
  */
-export function renderAtlassianMarkdown(envelope) {
+export function renderMarkdown(envelope) {
   const item = envelope.item ?? {}
   const label = item.key ?? 'unknown'
   const title = item.title ? ` — ${item.title}` : ''
@@ -171,7 +179,7 @@ export function renderAtlassianMarkdown(envelope) {
     '',
     `| | |`,
     `|---|---|`,
-    `| **Item** | ${label} |`,
+    `| **Item** | ${envelope.item.key ?? 'unknown'} |`,
     `| **State** | ${envelope.displayWord} |`,
     `| **Decision** | \`${envelope.decision?.decision ?? 'n/a'}\` |`,
     `| **Confidence** | ${(envelope.confidence * 100).toFixed(0)}% |`,

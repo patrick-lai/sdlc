@@ -44,7 +44,7 @@
     {
       "name": "pr-warden",
       "source": "./plugins/pr-warden",
-      "description": "Portable scheduled PR Warden: tend Bitbucket PRs with twg mechanical reads, policy classification, trusted-path repairs, and Bitbucket/Jira per-item actions. Never merges.",
+      "description": "Provider-neutral PR health for GitHub and Bitbucket: read-only inspection, bounded trusted-path repairs, and a permanent never-merge rule.",
       "version": "0.1.0",
       "author": {
         "name": "Patrick Lai",
@@ -54,19 +54,18 @@
       "license": "MIT",
       "keywords": [
         "pr",
+        "github",
         "bitbucket",
-        "jira",
         "warden",
         "review",
         "scheduled",
-        "automation",
-        "twg"
+        "automation"
       ],
       "category": "productivity",
       "tags": [
         "pr",
+        "github",
         "bitbucket",
-        "jira",
         "scheduled",
         "review"
       ],

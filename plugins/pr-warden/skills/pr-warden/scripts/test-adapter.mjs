@@ -2,8 +2,8 @@
 /**
  * Fixture tests for portable PR Warden adapter.
  * Covers: manual run, scheduled, duplicate, missing evidence, permission,
- * Bitbucket/Jira action planning retries, trusted-path PR-only gate,
- * and policy parity with Lumine classification.
+ * GitHub/Bitbucket action planning, trusted-path PR-only gate,
+ * never-merge policy, attempt bounds, and provider-neutral envelopes.
  */
 
 import assert from 'node:assert/strict'
@@ -20,11 +20,18 @@ import {
   mayMerge,
   isActionableByAgent,
   needsOperator,
-  afmBranchDeployAction,
   Policy,
+  PRWardenState,
   gatesFrom,
 } from './lib/policy.mjs'
 import { gateCodeChange, isTrustedPath } from './lib/trusted-paths.mjs'
+import {
+  latestReviewStates,
+  githubConflictStatus,
+  githubCiState,
+  unknownReviewFacts,
+  readScheduledWatch,
+} from './lib/github.mjs'
 import {
   buildIdempotencyKey,
   activityFingerprint,
@@ -38,7 +45,7 @@ import {
 } from './lib/ledger.mjs'
 import {
   buildResultEnvelope,
-  renderAtlassianMarkdown,
+  renderMarkdown,
 } from './lib/envelope.mjs'
 import { operatorHelper } from './lib/copy.mjs'
 import { buildReportDocument, renderHtmlReport } from './lib/report.mjs'
@@ -48,16 +55,10 @@ const FIX = path.resolve(__dirname, '../fixtures')
 const ADAPTER = path.resolve(__dirname, 'adapter.mjs')
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pr-warden-test-'))
 let failed = 0
+const tests = []
 
 function test(name, fn) {
-  try {
-    fn()
-    console.log(`ok  - ${name}`)
-  } catch (err) {
-    failed += 1
-    console.error(`fail - ${name}`)
-    console.error(err)
-  }
+  tests.push({ name, fn })
 }
 
 function readFix(name) {
@@ -72,7 +73,7 @@ function runAdapter(args, env = {}) {
   return res
 }
 
-// --- link parse (parity with PRWardenLinkParser) ---
+// --- provider-neutral link parsing ---
 test('parses Bitbucket PR URLs and strips query/fragment', () => {
   const r = parsePRLink(
     'https://bitbucket.org/ws/repo/pull-requests/42?src=x#comment-1',
@@ -90,13 +91,169 @@ test('parses shorthand coordinates', () => {
   assert.equal(keyDescription(a.link.key), keyDescription(b.link.key))
 })
 
-test('refuses GitHub and empty', () => {
-  assert.equal(parsePRLink('').ok, false)
-  assert.equal(parsePRLink('https://github.com/o/r/pull/1').ok, false)
-  assert.match(parsePRLink('https://github.com/o/r/pull/1').message, /GitHub/)
+test('parses GitHub PR URLs and provider-prefixed shorthands', () => {
+  const url = parsePRLink('https://github.com/patrick-lai/sdlc/pull/2?diff=split#discussion')
+  const short = parsePRLink('github:patrick-lai/sdlc#2')
+  assert.equal(url.ok, true)
+  assert.equal(short.ok, true)
+  assert.equal(url.link.url, 'https://github.com/patrick-lai/sdlc/pull/2')
+  assert.equal(keyDescription(url.link.key), 'github:patrick-lai/sdlc#2')
+  assert.equal(keyDescription(url.link.key), keyDescription(short.link.key))
 })
 
-// --- policy classification (parity with PRWardenPolicy.classify) ---
+test('refuses empty and unsupported providers', () => {
+  assert.equal(parsePRLink('').ok, false)
+  const result = parsePRLink('https://gitlab.com/o/r/merge_requests/1')
+  assert.equal(result.ok, false)
+  assert.equal(result.failure, 'unsupportedProvider')
+})
+
+test('GitHub review state uses each reviewer latest submitted review', () => {
+  const states = latestReviewStates([
+    {
+      id: 30,
+      state: 'APPROVED',
+      submitted_at: '2026-03-03T12:00:00Z',
+      user: { login: 'Reviewer-One' },
+    },
+    {
+      id: 10,
+      state: 'CHANGES_REQUESTED',
+      submitted_at: '2026-03-01T12:00:00Z',
+      user: { login: 'reviewer-one' },
+    },
+    { id: 41, state: 'APPROVED', user: { login: 'reviewer-two' } },
+    { id: 42, state: 'CHANGES_REQUESTED', user: { login: 'reviewer-two' } },
+  ])
+  assert.deepEqual(states.sort(), ['APPROVED', 'CHANGES_REQUESTED'])
+})
+
+test('GitHub conflicts require explicit dirty state', () => {
+  assert.equal(githubConflictStatus({ mergeable: false, mergeable_state: 'blocked' }, 'open'), null)
+  assert.equal(githubConflictStatus({ mergeable: false, mergeable_state: 'unknown' }, 'open'), null)
+  assert.equal(githubConflictStatus({ mergeable: false, mergeable_state: 'dirty' }, 'open'), true)
+  assert.equal(githubConflictStatus({ mergeable: true, mergeable_state: 'behind' }, 'open'), false)
+  assert.equal(githubConflictStatus({ mergeable: false, mergeable_state: 'dirty' }, 'merged'), false)
+})
+
+test('GitHub CI rollup acts only on identified required checks', () => {
+  const failed = [{ name: 'optional-lint', status: 'completed', conclusion: 'failure' }]
+  assert.equal(githubCiState({ state: 'failure' }, failed), 'unknown')
+  assert.equal(
+    githubCiState(null, [{ name: 'build', status: 'in_progress', conclusion: null }], ['build']),
+    'running',
+  )
+  assert.equal(
+    githubCiState(
+      { statuses: [{ context: 'required-status', state: 'success' }] },
+      [{ name: 'build', status: 'completed', conclusion: 'failure' }],
+      ['build', 'required-status'],
+    ),
+    'red',
+  )
+  assert.equal(
+    githubCiState(
+      null,
+      [
+        { name: 'build', status: 'completed', conclusion: 'success' },
+        { name: 'types', status: 'completed', conclusion: 'skipped' },
+      ],
+      ['build', 'types'],
+    ),
+    'green',
+  )
+  assert.equal(
+    githubCiState(
+      null,
+      [{ name: 'build', status: 'completed', conclusion: 'cancelled' }],
+      ['build'],
+    ),
+    'unknown',
+  )
+  assert.equal(githubCiState(null, [], ['build']), 'running')
+  assert.equal(githubCiState(null, [], []), 'green')
+})
+
+test('HTML fallback leaves current review state unknown and non-actionable', () => {
+  const reviewFacts = unknownReviewFacts()
+  assert.equal(reviewFacts.reviewStateKnown, false)
+  assert.equal(reviewFacts.changesRequested, null)
+  assert.equal(reviewFacts.approvalsSatisfied, null)
+  const envelope = buildResultEnvelope({
+    key: { provider: 'github', workspace: 'acme', repo: 'app', number: 9 },
+    facts: {
+      lifecycle: 'open',
+      isDraft: false,
+      ci: 'unknown',
+      requiredCiKnown: false,
+      hasConflicts: null,
+      unresolvedTasks: 0,
+      ...reviewFacts,
+      operatorActionCount: 0,
+      externalGateCount: 0,
+    },
+    conditions: {
+      repairable: [],
+      operatorActions: [],
+      externalGates: [],
+      waiting: ['Required CI and current review status require provider API authentication'],
+      ignored: [],
+    },
+  })
+  assert.equal(envelope.state, PRWardenState.ciUnknown)
+  assert.equal(envelope.decision.mayDispatchRepair, false)
+  assert.equal(envelope.gates.feedback, 'pending')
+  assert.ok(envelope.evidenceGaps.includes('Current review state unknown'))
+})
+
+test('scheduled GitHub watches perform a live read and fail closed', async () => {
+  const watch = {
+    key: { provider: 'github', workspace: 'acme', repo: 'app', number: 9 },
+    title: 'PR #9',
+    jiraKeys: ['APP-9'],
+    attemptCount: 2,
+  }
+  let reads = 0
+  const live = await readScheduledWatch(watch, async (link) => {
+    reads += 1
+    assert.equal(link.url, 'https://github.com/acme/app/pull/9')
+    return {
+      key: link.key,
+      url: link.url,
+      title: 'Live PR',
+      facts: { lifecycle: 'open', ci: 'unknown', hasConflicts: null },
+      conditions: { repairable: [], operatorActions: [], externalGates: [], waiting: [] },
+    }
+  })
+  assert.equal(reads, 1)
+  assert.equal(live.unreadable, undefined)
+  assert.equal(live.title, 'Live PR')
+  assert.equal(live.attemptCount, 2)
+  assert.deepEqual(live.jiraKeys, ['APP-9'])
+
+  const failed = await readScheduledWatch(watch, async () => {
+    throw new Error('network down')
+  })
+  assert.equal(failed.unreadable, true)
+  assert.match(failed.error, /^live_read_failed:network down$/)
+})
+
+test('scheduled Bitbucket watches fail closed without invoking a reader', async () => {
+  let reads = 0
+  const snap = await readScheduledWatch(
+    {
+      key: { provider: 'bitbucket', workspace: 'acme', repo: 'app', number: 9 },
+    },
+    async () => {
+      reads += 1
+    },
+  )
+  assert.equal(reads, 0)
+  assert.equal(snap.unreadable, true)
+  assert.equal(snap.error, 'live_read_unsupported_provider:bitbucket')
+})
+
+// --- policy classification ---
 test('classification prioritizes actionable work', () => {
   assert.equal(
     classify({ ci: 'red', hasConflicts: true, changesRequested: true }),
@@ -192,34 +349,6 @@ test('nextCheck intervals match policy floors', () => {
   assert.equal(nextCheck('readyToMerge', now), now + Policy.readySafetyInterval)
   assert.equal(nextCheck('merged', now), null)
   assert.equal(nextCheck('ciRed', now), now)
-})
-
-test('AFM branch deploy decision is pure', () => {
-  assert.equal(
-    afmBranchDeployAction({
-      workspace: 'atlassian',
-      repo: 'atlassian-frontend-monorepo',
-      branch: 'feat/x',
-    }).action,
-    'trigger',
-  )
-  assert.equal(
-    afmBranchDeployAction({
-      workspace: 'atlassian',
-      repo: 'raphael',
-      branch: 'feat/x',
-    }).action,
-    'skipNotAFM',
-  )
-  assert.equal(
-    afmBranchDeployAction({
-      workspace: 'atlassian',
-      repo: 'atlassian-frontend-monorepo',
-      branch: 'feat/x',
-      inFlightBuilds: [99],
-    }).action,
-    'skipAlreadyInFlight',
-  )
 })
 
 test('gates separate facts from journey status', () => {
@@ -374,7 +503,7 @@ test('envelope separates facts from decisions and exposes confidence', () => {
   assert.ok(env.facts)
   assert.ok(env.decision)
   assert.notEqual(env.facts, env.decision)
-  const md = renderAtlassianMarkdown(env)
+  const md = renderMarkdown(env)
   assert.match(md, /never merges/i)
   assert.match(md, /Confidence/)
   assert.match(md, /Required CI is red/)
@@ -387,7 +516,7 @@ test('operator helper names the mechanism and the human job', () => {
     facts: readFix('pr-snapshot.ready.json').facts,
     conditions: readFix('pr-snapshot.ready.json').conditions,
   })
-  assert.match(operatorHelper(ready), /Merge in Bitbucket/i)
+  assert.match(operatorHelper(ready), /Merge in your provider/i)
   assert.match(operatorHelper(ready), /will not press merge/i)
 
   const perm = buildResultEnvelope({
@@ -395,7 +524,7 @@ test('operator helper names the mechanism and the human job', () => {
     permissionFailure: true,
     unreadable: true,
   })
-  assert.match(operatorHelper(perm), /Sign in to twg/i)
+  assert.match(operatorHelper(perm), /Authenticate the provider CLI\/API/i)
 })
 
 test('HTML report is the baked template filled with envelope data', () => {
@@ -672,7 +801,7 @@ test('arm/stop/status round-trip is idempotent on duplicate arm', () => {
   const ledger = path.join(tmpRoot, 'arm-ledger.json')
   const cfg = path.join(tmpRoot, 'arm-cfg.json')
   fs.writeFileSync(cfg, JSON.stringify({ ledgerPath: ledger }))
-  const url = 'https://bitbucket.org/acme/app/pull-requests/9'
+  const url = 'https://github.com/acme/app/pull/9'
   let res = runAdapter(['arm', '--url', url, '--config', cfg])
   assert.equal(res.status, 0, res.stderr)
   let body = JSON.parse(res.stdout)
@@ -687,6 +816,22 @@ test('arm/stop/status round-trip is idempotent on duplicate arm', () => {
   assert.equal(JSON.parse(res.stdout).ok, true)
   res = runAdapter(['status', '--config', cfg])
   assert.equal(JSON.parse(res.stdout).under_watch, 0)
+})
+
+test('arm rejects providers without a scheduled live-read seam', () => {
+  const ledger = path.join(tmpRoot, 'unsupported-arm-ledger.json')
+  const cfg = path.join(tmpRoot, 'unsupported-arm-cfg.json')
+  fs.writeFileSync(cfg, JSON.stringify({ ledgerPath: ledger }))
+  const res = runAdapter([
+    'arm',
+    '--url',
+    'https://bitbucket.org/acme/app/pull-requests/9',
+    '--config',
+    cfg,
+  ])
+  assert.equal(res.status, 2)
+  assert.match(res.stderr, /currently supports GitHub PRs/)
+  assert.equal(fs.existsSync(ledger), false)
 })
 
 test('ready fixture does not plan repair', () => {
@@ -757,6 +902,17 @@ test('makeLink lowercases coordinates', () => {
   assert.equal(l.key.workspace, 'acme')
   assert.equal(l.key.repo, 'app')
 })
+
+for (const { name, fn } of tests) {
+  try {
+    await fn()
+    console.log(`ok  - ${name}`)
+  } catch (err) {
+    failed += 1
+    console.error(`fail - ${name}`)
+    console.error(err)
+  }
+}
 
 // cleanup note: tmpRoot left for inspection on failure; remove on success
 if (failed === 0) {

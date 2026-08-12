@@ -2,17 +2,11 @@
 /**
  * Smallest scheduler/adapter seam for portable PR Warden.
  *
- * Does NOT reimplement Lumine PR Warden. It:
- *  - normalizes invocation (manual / scheduled)
- *  - enforces idempotency via a file ledger
- *  - classifies facts with portable policy
- *  - emits the auditable Atlassian-native envelope
- *  - plans Bitbucket/Jira per-item actions (agent or operator executes side effects)
- *
- * When Raphael/MCP is available, prefer:
- *   pr_warden_watch / pr_warden_status / pr_warden_stop
- * and let the baked-in loop own dispatch. This adapter is the portable path
- * for Claude, Codex, and cron/agent schedules outside Lumine.
+ * It normalizes manual/scheduled invocation, enforces idempotency with a
+ * local ledger, classifies mechanical facts, and emits provider-neutral plans.
+ * The adapter never merges or approves. `inspect` is read-only and can inspect
+ * public GitHub PRs without credentials; authenticated agents may use their
+ * provider CLI for private repositories.
  *
  * Usage:
  *   node adapter.mjs parse-link <url>
@@ -37,10 +31,7 @@ import {
   DISPLAY_WORD,
   isActionableByAgent,
 } from './lib/policy.mjs'
-import {
-  buildResultEnvelope,
-  renderAtlassianMarkdown,
-} from './lib/envelope.mjs'
+import { buildResultEnvelope, renderMarkdown } from './lib/envelope.mjs'
 import { operatorHelper } from './lib/copy.mjs'
 import { buildReportDocument, writeHtmlReport } from './lib/report.mjs'
 import {
@@ -61,6 +52,13 @@ import {
   gateCodeChange,
   DEFAULT_TRUSTED_PATHS,
 } from './lib/trusted-paths.mjs'
+import {
+  latestReviewStates,
+  githubConflictStatus,
+  githubCiState,
+  unknownReviewFacts,
+  readScheduledWatch,
+} from './lib/github.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SKILL_ROOT = path.resolve(__dirname, '..')
@@ -122,7 +120,7 @@ function resolveConfig(args) {
     codeChangeMode: 'pr_only_trusted_paths',
     checkIntervalMinutes: 15,
     maxAttempts: Policy.maxRepairAttempts,
-    actions: { bitbucket: true, jira: true },
+    actions: { github: true, bitbucket: true, jira: false },
     dryRun: true,
     /** Operator site base, e.g. https://jira.example.com — unset ⇒ no Jira evidence URL */
     jiraBaseUrl: null,
@@ -165,10 +163,12 @@ function actionStatus(config, { observeOnly = false } = {}) {
  * Fixture shape matches portable extract of TodayService.PRWardenSnapshot.
  */
 function normalizeSnapshot(snap, fallbackKey) {
-  const key =
-    snap.key ??
-    (snap.workspace && snap.repo && snap.number
+  const parsedUrl = snap.url ? parsePRLink(snap.url) : null
+  const key = snap.key
+    ? { provider: snap.key.provider ?? snap.provider ?? parsedUrl?.link?.key?.provider ?? 'bitbucket', ...snap.key }
+    : (snap.workspace && snap.repo && snap.number
       ? {
+          provider: snap.provider ?? parsedUrl?.link?.key?.provider ?? 'bitbucket',
           workspace: String(snap.workspace).toLowerCase(),
           repo: String(snap.repo).toLowerCase(),
           number: Number(snap.number),
@@ -201,7 +201,7 @@ function normalizeSnapshot(snap, fallbackKey) {
     facts,
     conditions,
     title: snap.title ?? `Pull request #${key?.number ?? '?'}`,
-    url: snap.url ?? (key ? makeLink(key.workspace, key.repo, key.number).url : null),
+    url: snap.url ?? (key ? makeLink(key.workspace, key.repo, key.number, key.provider).url : null),
     branch: snap.branch ?? snap.sourceBranch ?? null,
     jiraKeys: snap.jiraKeys ?? [],
     unreadable: Boolean(snap.unreadable),
@@ -216,16 +216,17 @@ function planActions({ config, key, state, decision, url, jiraKeys, skill }) {
   if (!key) return actions
 
   const itemKey = keyDescription(key)
-  const bbBase = url ?? makeLink(key.workspace, key.repo, key.number).url
+  const provider = key.provider ?? 'bitbucket'
+  const providerUrl = url ?? makeLink(key.workspace, key.repo, key.number, provider).url
 
-  if (config.actions?.bitbucket) {
+  if (config.actions?.[provider]) {
     if (decision.decision === 'dispatch_repair') {
       actions.push({
-        surface: 'bitbucket',
+        surface: provider,
         kind: 'repair_pass',
         status: actionStatus(config),
         itemKey,
-        evidenceUrl: bbBase,
+        evidenceUrl: providerUrl,
         idempotencyKey: buildIdempotencyKey({
           key,
           skill,
@@ -235,11 +236,11 @@ function planActions({ config, key, state, decision, url, jiraKeys, skill }) {
       })
     } else if (decision.decision === 'handoff_operator' || decision.decision === 'escalate_exhausted') {
       actions.push({
-        surface: 'bitbucket',
+        surface: provider,
         kind: 'status_comment',
         status: actionStatus(config),
         itemKey,
-        evidenceUrl: bbBase,
+        evidenceUrl: providerUrl,
         idempotencyKey: buildIdempotencyKey({
           key,
           skill,
@@ -249,11 +250,11 @@ function planActions({ config, key, state, decision, url, jiraKeys, skill }) {
       })
     } else if (decision.decision === 'wait_and_recheck') {
       actions.push({
-        surface: 'bitbucket',
+        surface: provider,
         kind: 'observe_only',
         status: actionStatus(config, { observeOnly: true }),
         itemKey,
-        evidenceUrl: bbBase,
+        evidenceUrl: providerUrl,
       })
     }
   }
@@ -348,7 +349,7 @@ function runOne({ snap, config, skill, mode, ledger, force = false }) {
       jiraKeys: norm.jiraKeys,
       unreadable: true,
       permissionFailure: true,
-      evidenceGaps: ['Permission denied reading PR via twg/Bitbucket'],
+      evidenceGaps: ['Permission denied reading pull request from provider'],
       assumptions: ['Best-effort: no mutations performed'],
       confidence: 0.15,
       error: norm.error ?? 'permission_denied',
@@ -617,7 +618,7 @@ function cmdRun(args) {
   saveLedger(config.ledgerPath, ledger)
   const reportHtml = writeOperatorReport(args, [envelope], { mode })
   if (args.markdown) {
-    console.log(renderAtlassianMarkdown(envelope))
+    console.log(renderMarkdown(envelope))
   } else {
     console.log(JSON.stringify({ skipped, envelope, reportHtml }, null, 2))
   }
@@ -625,7 +626,7 @@ function cmdRun(args) {
   process.exit(skipped ? 0 : envelope.error ? 4 : 0)
 }
 
-function cmdSweep(args) {
+async function cmdSweep(args) {
   const config = resolveConfig(args)
   const skill = args.skill ?? 'pr-warden'
   const ledger = loadLedger(config.ledgerPath)
@@ -634,6 +635,7 @@ function cmdSweep(args) {
   for (const repo of config.repositories ?? []) {
     if (repo.workspace && repo.repo && repo.number) {
       const id = keyDescription({
+        provider: repo.provider ?? 'github',
         workspace: repo.workspace,
         repo: repo.repo,
         number: repo.number,
@@ -641,6 +643,7 @@ function cmdSweep(args) {
       if (!ledger.watches[id]) {
         upsertWatch(ledger, id, {
           key: {
+            provider: repo.provider ?? 'github',
             workspace: String(repo.workspace).toLowerCase(),
             repo: String(repo.repo).toLowerCase(),
             number: Number(repo.number),
@@ -659,17 +662,11 @@ function cmdSweep(args) {
   const results = []
   const snaps = fixtures.length
     ? fixtures
-    : dueWatches(ledger).map((w) => ({
-        ...w.key,
-        title: w.title,
-        url: w.url,
-        branch: w.branch,
-        jiraKeys: w.jiraKeys,
-        attemptCount: w.attemptCount ?? 0,
-        // Without fixtures, mark incomplete evidence and best-effort
-        unreadable: true,
-        error: 'no_live_snapshot_in_adapter',
-      }))
+    : await Promise.all(
+        dueWatches(ledger).map((watch) =>
+          readScheduledWatch(watch, readPublicGitHubSnapshot),
+        ),
+      )
 
   for (const snap of snaps) {
     const { envelope, skipped } = runOne({
@@ -742,7 +739,7 @@ function cmdDigest(args) {
         helper: operatorHelper(envelope),
         evidenceGaps: envelope.evidenceGaps,
         actions: envelope.actions,
-        markdown: renderAtlassianMarkdown(envelope),
+        markdown: renderMarkdown(envelope),
       })
     }
   }
@@ -771,12 +768,177 @@ function cmdDigest(args) {
   )
 }
 
+async function githubFetch(pathname) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'sdlc-pr-warden',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN
+  if (token) headers.Authorization = `Bearer ${token}`
+  let response = await fetch(`https://api.github.com${pathname}`, { headers })
+  // A stale local token must not break reads of public repositories.
+  if (response.status === 401 && headers.Authorization) {
+    delete headers.Authorization
+    response = await fetch(`https://api.github.com${pathname}`, { headers })
+  }
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`GitHub read failed (${response.status}): ${detail.slice(0, 240)}`)
+  }
+  return response.json()
+}
+
+async function readGitHubApiSnapshot(link) {
+  const { workspace: owner, repo, number } = link.key
+  const base = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
+  const pr = await githubFetch(`${base}/pulls/${number}`)
+  const [reviews, combinedStatus, checkRuns] = await Promise.all([
+    githubFetch(`${base}/pulls/${number}/reviews?per_page=100`),
+    githubFetch(`${base}/commits/${pr.head.sha}/status`).catch(() => null),
+    githubFetch(`${base}/commits/${pr.head.sha}/check-runs?per_page=100`).catch(() => null),
+  ])
+  const states = latestReviewStates(reviews)
+  const approvedReviews = states.filter((state) => state === 'APPROVED').length
+  const changesRequestedReviews = states.filter((state) => state === 'CHANGES_REQUESTED').length
+  const lifecycle = pr.merged_at ? 'merged' : pr.state === 'closed' ? 'declined' : 'open'
+  const ci = lifecycle === 'open'
+    ? githubCiState(combinedStatus, checkRuns?.check_runs)
+    : 'green'
+  const observedUnscopedFailure =
+    combinedStatus?.state === 'failure' ||
+    combinedStatus?.state === 'error' ||
+    (checkRuns?.check_runs ?? []).some((check) =>
+      ['failure', 'timed_out', 'action_required', 'startup_failure'].includes(check?.conclusion),
+    )
+  const repairable = []
+  if (ci === 'red') repairable.push('required CI is red')
+  if (changesRequestedReviews > 0) repairable.push('review feedback requests changes')
+  const waiting = []
+  if (lifecycle === 'open' && ci === 'running') waiting.push('CI is running')
+  if (lifecycle === 'open' && ci === 'unknown') waiting.push('CI status is unavailable')
+  return {
+    provider: 'github',
+    key: link.key,
+    title: pr.title,
+    url: link.url,
+    branch: pr.head?.ref ?? null,
+    facts: {
+      lifecycle,
+      isDraft: Boolean(pr.draft),
+      ci,
+      requiredCiKnown: lifecycle !== 'open',
+      hasConflicts: githubConflictStatus(pr, lifecycle),
+      unresolvedTasks: 0,
+      reviewStateKnown: true,
+      changesRequested: changesRequestedReviews > 0,
+      approvalsSatisfied: approvedReviews > 0 ? true : null,
+      operatorActionCount: 0,
+      externalGateCount: 0,
+      reviewCount: reviews.length,
+      approvedReviews,
+      changesRequestedReviews,
+    },
+    conditions: {
+      repairable,
+      operatorActions: [],
+      externalGates: [],
+      waiting,
+      ignored: observedUnscopedFailure
+        ? ['Failing checks observed, but required-check scope is unknown']
+        : [],
+    },
+  }
+}
+
+async function readGitHubHtmlSnapshot(link) {
+  const response = await fetch(link.url, { headers: { 'User-Agent': 'sdlc-pr-warden' } })
+  if (!response.ok) throw new Error(`GitHub HTML read failed (${response.status})`)
+  const html = await response.text()
+  const match = html.match(/<script type="application\/json" data-target="react-app\.embeddedData">([\s\S]*?)<\/script>/)
+  if (!match) throw new Error('GitHub public page did not contain pull-request metadata')
+  const data = JSON.parse(match[1])
+  const pr = data?.payload?.pullRequestsLayoutRoute?.pullRequest
+  if (!pr) throw new Error('GitHub public page metadata was incomplete')
+  const lifecycle = pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'declined' : 'open'
+  return {
+    provider: 'github',
+    key: link.key,
+    title: pr.title,
+    url: link.url,
+    branch: pr.headBranch ?? null,
+    facts: {
+      lifecycle,
+      isDraft: pr.state === 'DRAFT',
+      ci: 'unknown',
+      requiredCiKnown: lifecycle !== 'open',
+      hasConflicts: lifecycle === 'open' ? null : false,
+      unresolvedTasks: 0,
+      ...unknownReviewFacts(),
+      operatorActionCount: 0,
+      externalGateCount: 0,
+      source: 'github-public-html',
+    },
+    conditions: {
+      repairable: [],
+      operatorActions: [],
+      externalGates: [],
+      waiting: lifecycle === 'open'
+        ? ['Required CI and current review status require provider API authentication']
+        : [],
+      ignored: [],
+    },
+  }
+}
+
+async function readPublicGitHubSnapshot(link) {
+  try {
+    return await readGitHubApiSnapshot(link)
+  } catch (apiError) {
+    try {
+      return await readGitHubHtmlSnapshot(link)
+    } catch (htmlError) {
+      throw new Error(`${apiError instanceof Error ? apiError.message : apiError}; fallback failed: ${htmlError instanceof Error ? htmlError.message : htmlError}`)
+    }
+  }
+}
+
+async function cmdInspect(args) {
+  const parsed = parsePRLink(args.url ?? args._[1] ?? '')
+  if (!parsed.ok) {
+    console.log(JSON.stringify(parsed, null, 2))
+    process.exitCode = 2
+    return
+  }
+  if (parsed.link.key.provider !== 'github') {
+    console.error('inspect currently supports public GitHub PRs; use a supplied snapshot for Bitbucket.')
+    process.exitCode = 2
+    return
+  }
+  try {
+    const config = { ...resolveConfig(args), dryRun: true }
+    const ledger = { version: 1, watches: {}, runs: {} }
+    const snap = await readPublicGitHubSnapshot(parsed.link)
+    const { envelope } = runOne({ snap, config, skill: 'pr-warden', mode: 'manual', ledger, force: true })
+    envelope.provenance = [{ source: 'mechanical-read', tool: 'GitHub public REST API', at: new Date().toISOString() }]
+    console.log(JSON.stringify(envelope, null, 2))
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 4
+  }
+}
+
 function cmdArm(args) {
   const config = resolveConfig(args)
   const parsed = parsePRLink(args.url ?? args._[1] ?? '')
   if (!parsed.ok) {
     console.log(JSON.stringify(parsed, null, 2))
     process.exit(2)
+  }
+  if (parsed.link.key.provider !== 'github') {
+    console.error('arm currently supports GitHub PRs; use supplied snapshots for Bitbucket.')
+    process.exitCode = 2
+    return
   }
   const ledger = loadLedger(config.ledgerPath)
   const id = keyDescription(parsed.link.key)
@@ -809,7 +971,7 @@ function cmdStop(args) {
   const config = resolveConfig(args)
   const id = args.id ?? args._[1]
   if (!id) {
-    console.error('stop requires --id bitbucket:ws/repo#n')
+    console.error('stop requires --id github:owner/repo#n or bitbucket:workspace/repo#n')
     process.exit(1)
   }
   const ledger = loadLedger(config.ledgerPath)
@@ -840,7 +1002,7 @@ function cmdStatus(args) {
   )
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2))
   const cmd = args._[0] ?? 'help'
   switch (cmd) {
@@ -853,9 +1015,11 @@ function main() {
     case 'run':
       return cmdRun(args)
     case 'sweep':
-      return cmdSweep(args)
+      return await cmdSweep(args)
     case 'digest':
       return cmdDigest(args)
+    case 'inspect':
+      return await cmdInspect(args)
     case 'arm':
       return cmdArm(args)
     case 'stop':
@@ -873,12 +1037,13 @@ Commands:
   run --fixture <snapshot.json> [--config cfg.json] [--force] [--markdown] [--html [path]]
   sweep --fixture-dir <dir> [--config cfg.json] [--html [path]]
   digest --fixture-dir <dir> [--config cfg.json] [--html [path]]
-  arm --url <bitbucket-pr-url> [--config cfg.json]
-  stop --id bitbucket:ws/repo#n [--config cfg.json]
+  inspect --url <public-github-pr-url> [--config cfg.json]
+  arm --url <github-pr-url> [--config cfg.json]
+  stop --id <provider:owner/repo#n> [--config cfg.json]
   status [--config cfg.json]
 `)
       process.exit(cmd === 'help' ? 0 : 1)
   }
 }
 
-main()
+await main()
