@@ -85,11 +85,11 @@ function render() {
   if (items.length === 0) {
     els.empty.textContent =
       state.tasks.length === 0
-        ? 'No tasks yet. Add one above.'
+        ? 'No tasks yet. Add a title to exercise addTask.'
         : state.filter === 'ACTIVE'
-          ? 'No active tasks.'
+          ? 'No active tasks. list(ACTIVE) is empty — completed issues are under Completed.'
           : state.filter === 'COMPLETED'
-            ? 'No completed tasks.'
+            ? 'No completed tasks. Complete one to prove list(COMPLETED).'
             : 'No tasks match this filter.'
   }
 

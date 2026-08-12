@@ -13,6 +13,7 @@ import {
   DISPLAY_WORD,
   mayMerge,
 } from './policy.mjs'
+import { operatorHelper } from './copy.mjs'
 
 /**
  * @param {object} input
@@ -110,6 +111,8 @@ export function buildResultEnvelope(input = {}) {
     state,
     displayWord: DISPLAY_WORD[state] ?? state,
     decision,
+    attemptCount: input.attemptCount ?? 0,
+    permissionFailure: Boolean(input.permissionFailure),
     policy: {
       mayMerge: mayMerge(),
       codeChangeMode: input.codeChangeMode ?? 'pr_only_trusted_paths',
@@ -155,12 +158,20 @@ export function computeConfidence({ state, facts, evidenceGaps, permissionFailur
  * @param {object} envelope
  */
 export function renderAtlassianMarkdown(envelope) {
+  const item = envelope.item ?? {}
+  const label = item.key ?? 'unknown'
+  const title = item.title ? ` — ${item.title}` : ''
+  const helper = operatorHelper(envelope)
   const lines = [
     `### PR Warden · ${envelope.displayWord}`,
     '',
+    `**${label}**${title}`,
+    '',
+    helper,
+    '',
     `| | |`,
     `|---|---|`,
-    `| **Item** | ${envelope.item.key ?? 'unknown'} |`,
+    `| **Item** | ${label} |`,
     `| **State** | ${envelope.displayWord} |`,
     `| **Decision** | \`${envelope.decision?.decision ?? 'n/a'}\` |`,
     `| **Confidence** | ${(envelope.confidence * 100).toFixed(0)}% |`,

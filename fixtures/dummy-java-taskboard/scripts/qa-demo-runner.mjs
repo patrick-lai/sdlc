@@ -95,7 +95,7 @@ async function main() {
   try {
     const { chromium } = loadFrom(root, playwrightId)
     const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
-    const { showCaption, updateCaption, hideCaption } = await import(pathToFileURL(captionPath).href)
+    const { showCaption, hideCaption } = await import(pathToFileURL(captionPath).href)
 
     const format = hasFfmpeg() ? 'mp4' : 'webm'
     console.log(`[qa-demo] Target: ${BASE_URL}`)
@@ -122,66 +122,111 @@ async function main() {
       clean: true,
     })
 
-    // Title beat
-    await showCaption(page, 'QA: Java Task Board dummy fixture')
+    const newTitle = 'Prove qa-demo on Java fixture'
+
+    await showCaption(page, {
+      kicker: 'QA · TaskBoardService',
+      claim: 'Prove add, complete, list filters, and blank-title reject',
+      detail: 'Static UI mirrors com.example.taskboard — no invented backend',
+    })
     await hideCursor(page)
-    await page.waitForTimeout(1800)
+    await page.waitForTimeout(2400)
     await showCursor(page)
 
     await page.getByTestId('task-board-app').waitFor({ state: 'visible' })
+    await page.getByTestId('status').getByText('0 tasks').waitFor({ state: 'visible' })
 
-    // Happy path: set priority + add task
-    await updateCaption(page, 'Setting priority to High')
+    await showCaption(page, {
+      kicker: '01 · addTask',
+      claim: 'High-priority issue lands on the board',
+      detail: 'Priority HIGH + title must persist on the new row',
+    })
     await recorder.click('[data-testid="task-priority"]')
     await page.selectOption('[data-testid="task-priority"]', 'HIGH')
+    await recorder.type('[data-testid="task-title"]', newTitle, { delay: 22 })
+    await recorder.click('[data-testid="add-task"]')
     await page.waitForTimeout(400)
-
-    await updateCaption(page, 'Adding a high-priority task')
-    await recorder.type('[data-testid="task-title"]', 'Prove qa-demo on Java fixture', {
-      delay: 25,
-    })
-    await recorder.click('[data-testid="add-task"]', { zoom: 1.6 })
-    await page.waitForTimeout(600)
 
     const taskTitle = page.getByTestId('task-title-1')
     await taskTitle.waitFor({ state: 'visible', timeout: 5000 })
-    await page.getByTestId('priority-1').waitFor({ state: 'visible' })
-
-    // Complete
-    await updateCaption(page, 'Marking the task complete')
-    await recorder.click('[data-testid="toggle-1"]', { zoom: 2 })
-    await page.waitForTimeout(500)
-    await page.locator('.task.completed').waitFor({ state: 'visible', timeout: 5000 })
-
-    // Proof: completed filter
-    await updateCaption(page, 'Filtering to Completed')
-    await recorder.click('[data-testid="filter-completed"]')
-    await page.waitForTimeout(500)
-    await taskTitle.waitFor({ state: 'visible' })
-
-    // Edge: active empty state
-    await showCaption(page, 'Proof: Active filter is empty')
-    await recorder.click('[data-testid="filter-active"]')
-    await page.waitForTimeout(400)
+    await page.getByTestId('priority-1').getByText('HIGH').waitFor({ state: 'visible' })
+    await page.getByTestId('status').getByText('1 tasks · 1 active · 0 completed').waitFor({
+      state: 'visible',
+    })
     await hideCursor(page)
-    await page.getByTestId('empty-state').waitFor({ state: 'visible' })
-    await page.getByText('No active tasks.').waitFor({ state: 'visible' })
-    await recorder.zoom({ selector: '[data-testid="empty-state"]', scale: 1.8, duration: 700 })
-    await page.waitForTimeout(1400)
+    await recorder.zoom({ selector: '[data-testid="task-1"]', scale: 1.7, duration: 600 })
+    await recorder.screenshot('added-high-priority')
+    await page.waitForTimeout(2200)
     await recorder.zoom({ scale: 1, duration: 400 })
     await showCursor(page)
 
-    // Validation error proof
-    await updateCaption(page, 'Proof: empty title is rejected')
+    await showCaption(page, {
+      kicker: '02 · complete',
+      claim: 'The row flips to Done and stays checked',
+      detail: 'Task.markComplete — status line should read 0 active · 1 completed',
+    })
+    await recorder.click('[data-testid="toggle-1"]', { zoom: 2 })
+    await page.locator('.task.completed').waitFor({ state: 'visible', timeout: 5000 })
+    await page.getByTestId('status').getByText('1 tasks · 0 active · 1 completed').waitFor({
+      state: 'visible',
+    })
+    await hideCursor(page)
+    await page.waitForTimeout(2000)
+    await showCursor(page)
+
+    await showCaption(page, {
+      kicker: '03 · list(COMPLETED)',
+      claim: 'Completed filter still shows the same issue',
+      detail: 'list(COMPLETED) is not an empty list after markComplete',
+    })
+    await recorder.click('[data-testid="filter-completed"]')
+    await taskTitle.waitFor({ state: 'visible' })
+    await page.getByTestId('priority-1').waitFor({ state: 'visible' })
+    await recorder.screenshot('completed-filter')
+    await hideCursor(page)
+    await page.waitForTimeout(2000)
+    await showCursor(page)
+
+    await showCaption(page, {
+      kicker: '04 · list(ACTIVE)',
+      claim: 'Active filter is empty — copy names the contract',
+      detail: 'Empty state is not a blank list. list(ACTIVE) has no open tasks.',
+    })
+    await recorder.click('[data-testid="filter-active"]')
+    await page.getByTestId('empty-state').waitFor({ state: 'visible' })
+    await page.getByText(/No active tasks/).waitFor({ state: 'visible' })
+    await hideCursor(page)
+    await recorder.zoom({ selector: '[data-testid="empty-state"]', scale: 1.7, duration: 600 })
+    await recorder.screenshot('active-empty')
+    await page.waitForTimeout(2200)
+    await recorder.zoom({ scale: 1, duration: 400 })
+    await showCursor(page)
+
+    await showCaption(page, {
+      kicker: '05 · validation',
+      claim: 'Blank title is rejected — the completed row is untouched',
+      detail: 'addTask throws; error stays visible; list count stays at 1',
+    })
     await recorder.click('[data-testid="filter-all"]')
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(250)
     await recorder.click('[data-testid="add-task"]')
     await page.getByTestId('form-error').waitFor({ state: 'visible' })
-    await page.waitForTimeout(800)
-
-    await showCaption(page, 'Result: Task Board happy path + proofs work')
+    await page.getByText(/No row was added/).waitFor({ state: 'visible' })
+    await page.getByTestId('status').getByText('1 tasks · 0 active · 1 completed').waitFor({
+      state: 'visible',
+    })
+    await recorder.screenshot('blank-title-rejected')
     await hideCursor(page)
-    await page.waitForTimeout(1800)
+    await page.waitForTimeout(2200)
+    await showCursor(page)
+
+    await showCaption(page, {
+      kicker: 'Result',
+      claim: 'addTask, markComplete, both filters, and blank-title reject held',
+      detail: 'Counts, HIGH badge, completed row, empty-state copy, and error all asserted',
+    })
+    await hideCursor(page)
+    await page.waitForTimeout(2400)
     await hideCaption(page)
 
     const result = await recorder.stop()

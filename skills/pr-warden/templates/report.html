@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PR Warden</title>
+    <style>
+      :root {
+        --bg: #f4f5f7;
+        --surface: #ffffff;
+        --ink: #172b4d;
+        --muted: #44546f;
+        --faint: #626f86;
+        --line: #091e4224;
+        --line-strong: #091e424f;
+        --brand: #0c66e4;
+        --brand-ink: #0c66e4;
+        --danger: #ae2e24;
+        --danger-bg: #ffeceb;
+        --warn: #a54800;
+        --warn-bg: #fff7d6;
+        --ok: #216e4e;
+        --ok-bg: #dcfff1;
+        --info: #0055cc;
+        --info-bg: #e9f2ff;
+        --repair: #5e4db2;
+        --repair-bg: #f3f0ff;
+        --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+          "Liberation Sans", sans-serif;
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--ink);
+        font: 13px/1.45 var(--font);
+      }
+
+      a {
+        color: var(--brand);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        height: 48px;
+        padding: 0 20px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+      }
+
+      .mark {
+        width: 18px;
+        height: 18px;
+        border-radius: 3px;
+        background: var(--brand);
+      }
+
+      .top-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--faint);
+        font: 11px/1 var(--mono);
+      }
+
+      .never {
+        color: var(--ink);
+        border: 1px solid var(--line-strong);
+        border-radius: 3px;
+        padding: 4px 7px;
+        font-weight: 650;
+      }
+
+      .page {
+        width: min(1080px, calc(100% - 32px));
+        margin: 20px auto 48px;
+      }
+
+      .lede {
+        margin: 0 0 16px;
+        color: var(--muted);
+        max-width: 62ch;
+      }
+
+      .counts {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow: hidden;
+        background: var(--surface);
+        margin-bottom: 22px;
+      }
+
+      .count {
+        padding: 10px 12px 12px;
+        border-right: 1px solid var(--line);
+      }
+
+      .count:last-child {
+        border-right: 0;
+      }
+
+      .count b {
+        display: block;
+        font: 650 22px/1 var(--mono);
+        letter-spacing: -0.04em;
+      }
+
+      .count span {
+        display: block;
+        margin-top: 4px;
+        color: var(--faint);
+        font: 650 10px/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .count[data-band="needsYou"] b {
+        color: var(--danger);
+      }
+      .count[data-band="repairing"] b {
+        color: var(--repair);
+      }
+      .count[data-band="waiting"] b {
+        color: var(--warn);
+      }
+      .count[data-band="ready"] b {
+        color: var(--brand);
+      }
+
+      .band {
+        margin-bottom: 22px;
+      }
+
+      .band-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 0 0 8px;
+      }
+
+      .band-head h2 {
+        margin: 0;
+        font: 650 11px/1 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .band-head p {
+        margin: 0;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .band[data-band="needsYou"] h2 {
+        color: var(--danger);
+      }
+      .band[data-band="repairing"] h2 {
+        color: var(--repair);
+      }
+      .band[data-band="waiting"] h2 {
+        color: var(--warn);
+      }
+      .band[data-band="ready"] h2 {
+        color: var(--brand);
+      }
+      .band[data-band="settled"] h2 {
+        color: var(--faint);
+      }
+
+      .list {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 8px 1fr;
+        border-top: 1px solid var(--line);
+      }
+
+      .row:first-child {
+        border-top: 0;
+      }
+
+      .rail {
+        background: var(--faint);
+      }
+
+      .row[data-band="needsYou"] .rail {
+        background: var(--danger);
+      }
+      .row[data-band="repairing"] .rail {
+        background: var(--repair);
+      }
+      .row[data-band="waiting"] .rail {
+        background: var(--warn);
+      }
+      .row[data-band="ready"] .rail {
+        background: var(--brand);
+      }
+
+      .body {
+        padding: 12px 14px 14px;
+        min-width: 0;
+      }
+
+      .row-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .ident {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .key {
+        font: 650 12px/1.2 var(--mono);
+      }
+
+      .title {
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+
+      .word {
+        flex: 0 0 auto;
+        font: 650 10px/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 4px 6px;
+        border-radius: 3px;
+        background: var(--info-bg);
+        color: var(--info);
+      }
+
+      .row[data-band="needsYou"] .word {
+        background: var(--danger-bg);
+        color: var(--danger);
+      }
+      .row[data-band="repairing"] .word {
+        background: var(--repair-bg);
+        color: var(--repair);
+      }
+      .row[data-band="waiting"] .word {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .row[data-band="ready"] .word {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+
+      .meta {
+        margin: 4px 0 0;
+        color: var(--faint);
+        font: 12px/1.4 var(--mono);
+      }
+
+      .facts {
+        margin: 8px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 3px;
+        color: var(--muted);
+      }
+
+      .helper {
+        margin: 10px 0 0;
+        padding: 8px 10px;
+        background: var(--bg);
+        border-radius: 3px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      .helper strong {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      .gates {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+
+      .gate {
+        font: 650 10px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 4px 6px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        color: var(--muted);
+      }
+
+      .gate[data-status="blocked"] {
+        color: var(--danger);
+        border-color: #f87168;
+        background: var(--danger-bg);
+      }
+      .gate[data-status="active"] {
+        color: var(--warn);
+        border-color: #f5cd47;
+        background: var(--warn-bg);
+      }
+      .gate[data-status="human"] {
+        color: var(--brand);
+        border-color: #85b8ff;
+        background: var(--info-bg);
+      }
+      .gate[data-status="done"] {
+        color: var(--ok);
+        border-color: #94c748;
+        background: var(--ok-bg);
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+        font: 650 12px/1 var(--font);
+      }
+
+      .empty {
+        padding: 28px 16px;
+        color: var(--faint);
+        background: var(--surface);
+        border: 1px dashed var(--line-strong);
+        border-radius: 6px;
+      }
+
+      .foot {
+        margin-top: 8px;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      @media (max-width: 720px) {
+        .counts {
+          grid-template-columns: 1fr 1fr;
+        }
+        .count:nth-child(2) {
+          border-right: 0;
+        }
+        .count:nth-child(1),
+        .count:nth-child(2) {
+          border-bottom: 1px solid var(--line);
+        }
+        .row-top {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .page {
+          width: calc(100% - 20px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand"><span class="mark" aria-hidden="true"></span> PR Warden</div>
+      <div class="top-meta">
+        <span id="when"></span>
+        <span class="never">Never merges</span>
+      </div>
+    </header>
+    <main class="page" id="app">
+      <p class="lede">
+        Mechanical read of open Bitbucket PRs. Facts come from twg. Decisions are
+        policy. Warden may repair trusted paths on the PR branch; it will not
+        merge, approve, or mark ready.
+      </p>
+    </main>
+    <script type="application/json" id="warden-report">
+      __WARDEN_REPORT_JSON__
+    </script>
+    <script>
+      ;(function () {
+        const raw = document.getElementById('warden-report').textContent.trim()
+        let data
+        try {
+          data = JSON.parse(raw)
+        } catch {
+          data = {
+            generatedAt: null,
+            total: 0,
+            counts: { needsYou: 0, repairing: 0, waiting: 0, ready: 0 },
+            bands: [],
+            neverMerges: true,
+          }
+        }
+
+        const app = document.getElementById('app')
+        const when = document.getElementById('when')
+        when.textContent = formatWhen(data.generatedAt, data.window)
+
+        const counts = el('div', { class: 'counts', role: 'group', 'aria-label': 'PR counts' }, [
+          countCell('needsYou', 'Needs you', data.counts?.needsYou),
+          countCell('repairing', 'Warden can act', data.counts?.repairing),
+          countCell('waiting', 'Waiting', data.counts?.waiting),
+          countCell('ready', 'Ready to merge', data.counts?.ready),
+        ])
+        app.appendChild(counts)
+
+        if (!data.bands || data.bands.length === 0) {
+          app.appendChild(
+            el('p', { class: 'empty' }, [
+              'No PRs in this report. Run the adapter against open PRs or a fixture directory.',
+            ]),
+          )
+        } else {
+          for (const band of data.bands) {
+            app.appendChild(renderBand(band))
+          }
+        }
+
+        app.appendChild(
+          el('p', { class: 'foot' }, [
+            data.total +
+              ' PR' +
+              (data.total === 1 ? '' : 's') +
+              ' · schema ' +
+              (data.schema || 'sdlc.pr-warden.report/v1') +
+              ' · Warden never merges.',
+          ]),
+        )
+
+        function countCell(band, label, n) {
+          return el('div', { class: 'count', 'data-band': band }, [
+            el('b', {}, [String(n ?? 0)]),
+            el('span', {}, [label]),
+          ])
+        }
+
+        function renderBand(band) {
+          const section = el('section', { class: 'band', 'data-band': band.id }, [
+            el('div', { class: 'band-head' }, [
+              el('h2', {}, [band.title]),
+              el('p', {}, [band.helper]),
+            ]),
+          ])
+          const list = el('div', { class: 'list' })
+          for (const item of band.items || []) list.appendChild(renderRow(item, band.id))
+          section.appendChild(list)
+          return section
+        }
+
+        function renderRow(item, band) {
+          const repo =
+            item.workspace && item.repo ? item.workspace + '/' + item.repo : item.key || 'unknown'
+          const identKids = []
+          if (item.number != null) {
+            identKids.push(el('span', { class: 'key' }, ['#' + item.number]))
+          }
+          identKids.push(el('span', { class: 'title' }, [item.title || 'Untitled PR']))
+
+          const facts = []
+          for (const r of item.repairable || []) facts.push(el('li', {}, [r]))
+          for (const h of item.humanGates || []) {
+            facts.push(el('li', {}, ['Human / external: ' + h]))
+          }
+          for (const g of item.evidenceGaps || []) {
+            facts.push(el('li', {}, ['Gap: ' + g]))
+          }
+
+          const gateOrder = ['ci', 'conflicts', 'feedback', 'approvals', 'ready']
+          const gates = el('div', { class: 'gates', 'aria-label': 'Gates' })
+          const g = item.gates || {}
+          for (const name of gateOrder) {
+            if (!g[name]) continue
+            gates.appendChild(
+              el('span', { class: 'gate', 'data-status': g[name] }, [name + ' · ' + g[name]]),
+            )
+          }
+          if (item.attempts) {
+            gates.appendChild(
+              el('span', { class: 'gate' }, [
+                'attempts ' + item.attempts.used + '/' + item.attempts.max,
+              ]),
+            )
+          }
+          if (item.confidence != null) {
+            gates.appendChild(
+              el('span', { class: 'gate' }, [
+                'confidence ' + Math.round(item.confidence * 100) + '%',
+              ]),
+            )
+          }
+
+          const links = el('div', { class: 'links' })
+          if (item.url) links.appendChild(el('a', { href: item.url }, ['Open PR']))
+          for (const key of item.jiraKeys || []) {
+            links.appendChild(el('span', { class: 'key' }, [key]))
+          }
+
+          return el('article', { class: 'row', 'data-band': band, 'data-state': item.state }, [
+            el('div', { class: 'rail', 'aria-hidden': 'true' }),
+            el('div', { class: 'body' }, [
+              el('div', { class: 'row-top' }, [
+                el('div', { class: 'ident' }, identKids),
+                el('span', { class: 'word' }, [item.displayWord || item.state || 'unknown']),
+              ]),
+              el('p', { class: 'meta' }, [
+                repo +
+                  (item.branch ? ' · ' + item.branch : '') +
+                  (item.decision ? ' · ' + item.decision : ''),
+              ]),
+              facts.length ? el('ul', { class: 'facts' }, facts) : null,
+              el('p', { class: 'helper' }, [
+                el('strong', {}, ['What this means. ']),
+                item.helper || '',
+              ]),
+              gates,
+              links.childNodes.length ? links : null,
+            ]),
+          ])
+        }
+
+        function el(tag, attrs, kids) {
+          const n = document.createElement(tag)
+          for (const [k, v] of Object.entries(attrs || {})) {
+            if (v == null || v === false) continue
+            n.setAttribute(k, String(v))
+          }
+          for (const kid of kids || []) {
+            if (kid == null || kid === false) continue
+            n.appendChild(typeof kid === 'string' ? document.createTextNode(kid) : kid)
+          }
+          return n
+        }
+
+        function formatWhen(iso, window) {
+          if (!iso && !window) return ''
+          try {
+            const d = iso ? new Date(iso) : null
+            const clock = d && !Number.isNaN(d.getTime()) ? d.toLocaleString() : iso || ''
+            return window ? clock + ' · ' + window : clock
+          } catch {
+            return iso || ''
+          }
+        }
+      })()
+    </script>
+  </body>
+</html>

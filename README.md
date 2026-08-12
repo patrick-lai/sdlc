@@ -67,6 +67,12 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 
 Schedule that prompt **every 30 minutes** in Claude/Codex/Cursor. Needs `twg` signed in. Never merges.
 
+The operator sheet is a baked HTML template (not agent-authored markup):
+
+```bash
+npm run pr-warden -- digest --fixture-dir skills/pr-warden/fixtures --html .pr-warden-report.html
+```
+
 ```bash
 npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
 # Claude: /plugin install pr-warden@sdlc
@@ -92,7 +98,7 @@ Helper scripts live under `skills/qa-demo/scripts/`:
 
 | Script | Purpose |
 |--------|---------|
-| `caption-overlay.mjs` | DOM caption banner (`#__sdlc_caption`) via Playwright |
+| `caption-overlay.mjs` | Proof captions (`kicker` / `claim` / `detail`) via Playwright |
 | `smoke-testreel.mjs` | Self-contained narrated smoke against TodoMVC |
 
 ### Validate TestReel locally

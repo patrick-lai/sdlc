@@ -37,6 +37,15 @@ Schedule the default line **every 30 minutes**. Needs `twg` signed in. No fixtur
    - Ready to merge → tell user; **never merge**.
    - Red CI / conflicts / code review feedback → repair only if under attempt budget (below).
 5. **Reply short** — one line per PR that changed or needs the user. Silence is OK when nothing changed.
+6. **Write the HTML report** (do not invent HTML/CSS). Fill the baked template:
+
+   ```bash
+   node skills/pr-warden/scripts/adapter.mjs digest \
+     --fixture-dir <snapshots-or-live-dir> \
+     --html .pr-warden-report.html
+   ```
+
+   Template: [`templates/report.html`](templates/report.html). Adapter injects envelope data only. Copy lives in `scripts/lib/copy.mjs` — do not rewrite helper sentences in the page.
 
 ### Hard rules (always)
 
@@ -95,6 +104,12 @@ Install once:
 ```bash
 npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
 ```
+
+## Operator report
+
+Hand the user `.pr-warden-report.html` (or the path `--html` wrote). The page is the designed status sheet: Needs you / Warden can act / Waiting / Ready to merge. Each row has a **What this means** sentence. Never merge is chrome, not a suggestion.
+
+`--html` on `run`, `sweep`, or `digest`. Default path: `.pr-warden-report.html`.
 
 ## Optional (debug only)
 

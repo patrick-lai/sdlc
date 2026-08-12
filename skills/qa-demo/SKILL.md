@@ -107,16 +107,29 @@ Prefer `mp4` when `ffmpeg` is available; otherwise `webm`.
 
 ### 5. Narration (required)
 
-Every major beat MUST show an on-screen caption. Captions are **audience-facing**, short, and present-tense:
+Every major beat MUST show an on-screen caption. Captions **prove a claim**, they do not narrate the click.
 
-- Good: “Opening the new Filter panel”, “Verifying empty state”, “Submitting the form”
-- Bad: “clicking div.css-x7”, “running assert #3”, internal file names
+```js
+await showCaption(page, {
+  kicker: '02 · complete',
+  claim: 'TB-1 flips to Done and stays checked',
+  detail: 'Task.markComplete — completed filter will still list it',
+})
+```
+
+| | Write this | Not this |
+|---|---|---|
+| **Kicker** | Beat + contract (`03 · list(COMPLETED)`) | `step 3`, `click` |
+| **Claim** | What a reviewer should see now | “Clicking the toggle” |
+| **Detail** | The behavior/API being proved | Internal selectors, file names |
 
 Include:
 
-1. **Title card** at start (PR number/title or feature name)
-2. Caption before each major interaction or reveal
-3. **Result** caption at the end
+1. **Title card** — PR/feature + the one sentence of what this reel proves
+2. Caption **before** each interaction, then zoom/wait on the resulting state
+3. **Result** — list the claims that actually held (not “feature works”)
+
+Read time: 2.0–2.8s after a 3-line caption (`hideCursor` during the wait). Assert the claim with Playwright before advancing — if the assert fails, the reel is PARTIAL.
 
 Use the helper:
 
@@ -128,19 +141,7 @@ import {
 } from './scripts/caption-overlay.mjs'
 ```
 
-Pattern for an “explain this moment” beat:
-
-```js
-import { hideCursor, showCursor } from 'testreel'
-
-await showCaption(page, 'Verifying empty state')
-await hideCursor(page)
-await page.waitForTimeout(1800) // let viewers read
-await showCursor(page)
-await hideCaption(page)
-```
-
-Caption element id is always `__sdlc_caption`. Style guidelines live in the helper (high contrast, large type, safe margins). Position: bottom banner by default; top only if the UI under test occupies the bottom edge.
+Caption element id is always `__sdlc_caption`. Position: bottom-left lower-third by default; top only if the UI under test occupies the bottom edge.
 
 ### 6. Record with TestReel
 
@@ -177,17 +178,25 @@ Caption element id is always `__sdlc_caption`. Style guidelines live in the help
      outputFormat: hasFfmpeg ? 'mp4' : 'webm',
    })
 
-   await showCaption(page, `QA: ${featureTitle}`)
+   await showCaption(page, {
+     kicker: 'QA demo',
+     claim: featureTitle,
+     detail: 'Proving the happy path plus one failure and one empty state',
+   })
    await hideCursor(page)
-   await page.waitForTimeout(2000)
+   await page.waitForTimeout(2400)
    await showCursor(page)
 
    // …interactions via recorder.click / type / zoom …
-   // showCaption before each major beat; hideCursor during long waits
+   // showCaption (kicker/claim/detail) before each beat; hideCursor while they read
 
-   await showCaption(page, 'Result: feature works end-to-end')
+   await showCaption(page, {
+     kicker: 'Result',
+     claim: 'Happy path, validation, and empty state all held',
+     detail: 'Do not say PASS unless every Playwright assert above succeeded',
+   })
    await hideCursor(page)
-   await page.waitForTimeout(2000)
+   await page.waitForTimeout(2400)
 
    const result = await recorder.stop()
    await browser.close()

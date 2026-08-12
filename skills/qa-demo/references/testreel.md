@@ -123,18 +123,31 @@ Keep the raw Playwright `page` for caption `evaluate` calls and assertions.
 
 ## Narration recipe
 
-1. `showCaption(page, text)` from `caption-overlay.mjs`
-2. Optional `hideCursor(page)` for reading beats
-3. `wait` 1.2–2.5s so captions are readable
-4. `showCursor(page)` before the next interaction
-5. Update or hide caption before the next beat
+Quality bar (kicker / claim / detail, assert before advancing) lives in `SKILL.md` §5. This section is the call shape.
 
-Title caption first; Result caption last.
+```js
+await showCaption(page, {
+  kicker: '01 · addTask',
+  claim: 'High-priority issue lands as TB-1',
+  detail: 'Title + HIGH persist after create',
+})
+await hideCursor(page)
+await page.waitForTimeout(2400)
+await showCursor(page)
+```
+
+1. Caption **before** the interaction
+2. Do the action, then **zoom the resulting state** (not the button)
+3. `hideCursor` + 2.0–2.8s so the claim is readable
+4. Playwright-assert the claim; named screenshot of that beat
+5. Result caption lists only what actually held
+
+`showCaption(page, 'plain string')` still works; prefer the spec object for deliverables.
 
 ## Polish tips
 
-- Prefer dark slate gradients over default purple marketing gradients for SDLC demos
-- Zoom on the control that proves the PR
+- Prefer Atlassian blue chrome (`#0052CC` → `#0747A6`) over purple marketing gradients
+- Zoom the **proof** (new row, badge, empty copy, error), not the cursor target
 - Keep demos under ~60–90s when possible
-- Name screenshots after beats (`empty-state`, `after-submit`)
+- Name screenshots after claims (`added-high-priority`, `active-empty`)
 - On failure, keep `testreel-output/` partial artifacts

@@ -55,3 +55,7 @@ playwright/.cache/
 
 # PR Warden agent run state
 .pr-warden-state.json
+
+# PR Warden generated operator sheet
+.pr-warden-report.html
+**/.pr-warden-report.html

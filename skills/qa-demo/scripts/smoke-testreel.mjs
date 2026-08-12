@@ -162,40 +162,64 @@ async function main() {
       clean: true,
     })
 
-    await showCaption(page, 'QA Demo smoke — TestReel + captions')
+    await showCaption(page, {
+      kicker: 'QA demo smoke',
+      claim: 'TestReel + caption overlays are wired',
+      detail: 'Toolchain check — not a product proof',
+    })
     await hideCursor(page)
-    await page.waitForTimeout(1800)
+    await page.waitForTimeout(2000)
     await showCursor(page)
 
     if (useTodoMvc || url.includes('todomvc')) {
-      await updateCaption(page, 'Adding a todo item')
+      await updateCaption(page, {
+        kicker: '01 · add',
+        claim: 'New todo is typed into the list',
+        detail: 'Item text must appear after Enter',
+      })
       await recorder.type('.new-todo', 'Ship qa-demo skill', { delay: 40 })
       await recorder.keyboard('Enter')
       await page.waitForTimeout(600)
 
-      await updateCaption(page, 'Marking the todo complete')
+      await updateCaption(page, {
+        kicker: '02 · complete',
+        claim: 'The todo flips to completed',
+        detail: 'li.completed must be visible after the toggle',
+      })
       await recorder.click('.todo-list li:first-child .toggle', { zoom: 2 })
       await page.waitForTimeout(500)
 
-      await showCaption(page, 'Verifying completed state')
+      await showCaption(page, {
+        kicker: '03 · proof',
+        claim: 'Completed state is on screen',
+        detail: 'Zoom the list row — this is the assert the smoke requires',
+      })
       await hideCursor(page)
       await recorder.zoom({ selector: '.todo-list', scale: 1.8, duration: 700 })
-      await page.waitForTimeout(1600)
+      await page.waitForTimeout(1800)
       await recorder.zoom({ scale: 1, duration: 500 })
       await showCursor(page)
 
       const completed = page.locator('.todo-list li.completed')
       await completed.waitFor({ state: 'visible', timeout: 5000 })
     } else {
-      await updateCaption(page, 'Checking the Example Domain heading')
+      await updateCaption(page, {
+        kicker: 'Fallback',
+        claim: 'Example Domain heading is visible',
+        detail: 'TodoMVC was unreachable — this only proves navigation',
+      })
       await hideCursor(page)
-      await page.waitForTimeout(1200)
+      await page.waitForTimeout(1600)
       await showCursor(page)
       await page.getByRole('heading', { name: /example domain/i }).waitFor({ state: 'visible' })
       await recorder.screenshot('example-heading')
     }
 
-    await showCaption(page, 'Result: TestReel smoke passed')
+    await showCaption(page, {
+      kicker: 'Result',
+      claim: 'Caption overlay + TestReel record/stop succeeded',
+      detail: 'Use the Task Board runner for a product-level proof reel',
+    })
     await hideCursor(page)
     await page.waitForTimeout(1800)
     await hideCaption(page)

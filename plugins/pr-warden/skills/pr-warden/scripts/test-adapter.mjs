@@ -40,6 +40,8 @@ import {
   buildResultEnvelope,
   renderAtlassianMarkdown,
 } from './lib/envelope.mjs'
+import { operatorHelper } from './lib/copy.mjs'
+import { buildReportDocument, renderHtmlReport } from './lib/report.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FIX = path.resolve(__dirname, '../fixtures')
@@ -375,6 +377,59 @@ test('envelope separates facts from decisions and exposes confidence', () => {
   const md = renderAtlassianMarkdown(env)
   assert.match(md, /never merges/i)
   assert.match(md, /Confidence/)
+  assert.match(md, /Required CI is red/)
+  assert.equal(env.attemptCount, 0)
+})
+
+test('operator helper names the mechanism and the human job', () => {
+  const ready = buildResultEnvelope({
+    key: { workspace: 'acme', repo: 'payments', number: 1 },
+    facts: readFix('pr-snapshot.ready.json').facts,
+    conditions: readFix('pr-snapshot.ready.json').conditions,
+  })
+  assert.match(operatorHelper(ready), /Merge in Bitbucket/i)
+  assert.match(operatorHelper(ready), /will not press merge/i)
+
+  const perm = buildResultEnvelope({
+    key: { workspace: 'acme', repo: 'payments', number: 2 },
+    permissionFailure: true,
+    unreadable: true,
+  })
+  assert.match(operatorHelper(perm), /Sign in to twg/i)
+})
+
+test('HTML report is the baked template filled with envelope data', () => {
+  const snaps = [
+    'pr-snapshot.ci-red.json',
+    'pr-snapshot.ready.json',
+    'pr-snapshot.permission.json',
+  ].map((name) => {
+    const snap = readFix(name)
+    return buildResultEnvelope({
+      key: { workspace: snap.workspace, repo: snap.repo, number: snap.number },
+      url: snap.url,
+      title: snap.title,
+      branch: snap.branch,
+      facts: snap.facts ?? null,
+      conditions: snap.conditions,
+      jiraKeys: snap.jiraKeys,
+      permissionFailure: snap.permissionFailure,
+      unreadable: snap.unreadable,
+    })
+  })
+  const doc = buildReportDocument({ envelopes: snaps, mode: 'manual' })
+  assert.equal(doc.schema, 'sdlc.pr-warden.report/v1')
+  assert.equal(doc.neverMerges, true)
+  assert.ok(doc.counts.repairing >= 1)
+  assert.ok(doc.counts.ready >= 1)
+  assert.ok(doc.counts.needsYou >= 1)
+  const html = renderHtmlReport(doc)
+  assert.match(html, /Never merges/)
+  assert.match(html, /What this means/)
+  assert.match(html, /Fix checkout tax edge case/)
+  assert.match(html, /Ready green PR/)
+  assert.doesNotMatch(html, /__WARDEN_REPORT_JSON__/)
+  assert.match(html, /--bg: #f4f5f7/)
 })
 
 test('incomplete evidence lowers confidence and lists gaps', () => {
@@ -584,7 +639,33 @@ test('digest surfaces risk items only', () => {
   assert.ok(body.riskCount >= 1)
   for (const item of body.items) {
     assert.ok(item.markdown.includes('PR Warden'))
+    assert.ok(typeof item.helper === 'string' && item.helper.length > 0)
   }
+})
+
+test('digest --html writes the baked report', () => {
+  const ledger = path.join(tmpRoot, 'digest-html-ledger.json')
+  const cfg = path.join(tmpRoot, 'digest-html-cfg.json')
+  const htmlPath = path.join(tmpRoot, 'warden-report.html')
+  fs.writeFileSync(cfg, JSON.stringify({ ledgerPath: ledger, dryRun: true }))
+  const res = runAdapter([
+    'digest',
+    '--fixture-dir',
+    FIX,
+    '--config',
+    cfg,
+    '--force',
+    '--html',
+    htmlPath,
+  ])
+  assert.equal(res.status, 0, res.stderr)
+  const body = JSON.parse(res.stdout)
+  assert.equal(body.reportHtml, htmlPath)
+  const html = fs.readFileSync(htmlPath, 'utf8')
+  assert.match(html, /PR Warden/)
+  assert.match(html, /Never merges/)
+  assert.match(html, /What this means/)
+  assert.ok(html.includes('Fix checkout tax') || html.includes('410074'))
 })
 
 test('arm/stop/status round-trip is idempotent on duplicate arm', () => {

@@ -77,6 +77,18 @@ body {
   color: var(--muted);
 }
 
+.field-help {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+code {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+
 input,
 select,
 button {

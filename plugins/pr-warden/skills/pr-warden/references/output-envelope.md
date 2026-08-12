@@ -37,6 +37,8 @@ Every manual or scheduled result uses this shape. Facts and decisions stay in se
   },
   "state": "ciRed",
   "displayWord": "CI red",
+  "attemptCount": 0,
+  "permissionFailure": false,
   "decision": {
     "decision": "dispatch_repair",
     "reason": "…",
@@ -87,6 +89,16 @@ Every manual or scheduled result uses this shape. Facts and decisions stay in se
 ## Atlassian markdown
 
 `renderAtlassianMarkdown(envelope)` produces a short comment body for Bitbucket/Jira with item links and evidence.
+
+## HTML report
+
+Do not generate a page. Fill [`templates/report.html`](../templates/report.html):
+
+```bash
+node scripts/adapter.mjs digest --fixture-dir fixtures --html .pr-warden-report.html
+```
+
+`renderHtmlReport(buildReportDocument({ envelopes }))` in `scripts/lib/report.mjs`. Operator sentences come from `scripts/lib/copy.mjs`. Schema of the injected document: `sdlc.pr-warden.report/v1`.
 
 ## Risk digest wrapper
 

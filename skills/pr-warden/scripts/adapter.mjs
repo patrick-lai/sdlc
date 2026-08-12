@@ -41,6 +41,8 @@ import {
   buildResultEnvelope,
   renderAtlassianMarkdown,
 } from './lib/envelope.mjs'
+import { operatorHelper } from './lib/copy.mjs'
+import { buildReportDocument, writeHtmlReport } from './lib/report.mjs'
 import {
   loadLedger,
   saveLedger,
@@ -70,6 +72,27 @@ function readJson(file) {
 function writeJson(file, data) {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n')
+}
+
+function htmlOutPath(args) {
+  if (!args.html) return null
+  if (args.html === true) return path.resolve('.pr-warden-report.html')
+  return path.resolve(String(args.html))
+}
+
+function writeOperatorReport(args, envelopes, meta = {}) {
+  const file = htmlOutPath(args)
+  if (!file) return null
+  writeHtmlReport(
+    file,
+    buildReportDocument({
+      envelopes,
+      generatedAt: new Date().toISOString(),
+      window: meta.window ?? null,
+      mode: meta.mode ?? 'manual',
+    }),
+  )
+  return file
 }
 
 function parseArgs(argv) {
@@ -592,10 +615,11 @@ function cmdRun(args) {
     force: Boolean(args.force),
   })
   saveLedger(config.ledgerPath, ledger)
+  const reportHtml = writeOperatorReport(args, [envelope], { mode })
   if (args.markdown) {
     console.log(renderAtlassianMarkdown(envelope))
   } else {
-    console.log(JSON.stringify({ skipped, envelope }, null, 2))
+    console.log(JSON.stringify({ skipped, envelope, reportHtml }, null, 2))
   }
   if (args.out) writeJson(path.resolve(args.out), envelope)
   process.exit(skipped ? 0 : envelope.error ? 4 : 0)
@@ -659,6 +683,11 @@ function cmdSweep(args) {
     results.push({ skipped, envelope })
   }
   saveLedger(config.ledgerPath, ledger)
+  const reportHtml = writeOperatorReport(
+    args,
+    results.map((r) => r.envelope),
+    { mode: 'scheduled' },
+  )
   console.log(
     JSON.stringify(
       {
@@ -666,12 +695,14 @@ function cmdSweep(args) {
         mode: 'scheduled',
         count: results.length,
         duplicates: results.filter((r) => r.skipped).length,
+        reportHtml,
         results: results.map((r) => ({
           skipped: r.skipped,
           item: r.envelope.item.key,
           state: r.envelope.state,
           decision: r.envelope.decision?.decision,
           confidence: r.envelope.confidence,
+          helper: operatorHelper(r.envelope),
           idempotencyKey: r.envelope.idempotencyKey,
           actions: r.envelope.actions,
         })),
@@ -689,6 +720,7 @@ function cmdDigest(args) {
   const fixtures = loadFixtures(args['fixture-dir'] ?? args.fixtureDir)
   const riskStates = new Set(['ciRed', 'conflict', 'needsWork', 'needsYou', 'unreadable'])
   const items = []
+  const all = []
 
   for (const snap of fixtures) {
     const { envelope } = runOne({
@@ -699,6 +731,7 @@ function cmdDigest(args) {
       ledger,
       force: Boolean(args.force),
     })
+    all.push(envelope)
     if (riskStates.has(envelope.state) || envelope.decision?.mayDispatchRepair) {
       items.push({
         item: envelope.item,
@@ -706,6 +739,7 @@ function cmdDigest(args) {
         displayWord: envelope.displayWord,
         decision: envelope.decision,
         confidence: envelope.confidence,
+        helper: operatorHelper(envelope),
         evidenceGaps: envelope.evidenceGaps,
         actions: envelope.actions,
         markdown: renderAtlassianMarkdown(envelope),
@@ -713,15 +747,22 @@ function cmdDigest(args) {
     }
   }
   saveLedger(config.ledgerPath, ledger)
+  const generatedAt = new Date().toISOString()
+  const window = dayWindow()
+  const reportHtml = writeOperatorReport(args, all, {
+    mode: 'scheduled-digest',
+    window,
+  })
 
   console.log(
     JSON.stringify(
       {
         schema: 'sdlc.pr-warden.risk-digest/v1',
         skill,
-        generatedAt: new Date().toISOString(),
-        window: dayWindow(),
+        generatedAt,
+        window,
         riskCount: items.length,
+        reportHtml,
         items,
       },
       null,
@@ -829,9 +870,9 @@ Commands:
   parse-link <url>
   classify --facts <snapshot.json>
   gate-paths --files a,b --trusted 'src/**,lib/**'
-  run --fixture <snapshot.json> [--config cfg.json] [--force] [--markdown]
-  sweep --fixture-dir <dir> [--config cfg.json]
-  digest --fixture-dir <dir> [--config cfg.json]
+  run --fixture <snapshot.json> [--config cfg.json] [--force] [--markdown] [--html [path]]
+  sweep --fixture-dir <dir> [--config cfg.json] [--html [path]]
+  digest --fixture-dir <dir> [--config cfg.json] [--html [path]]
   arm --url <bitbucket-pr-url> [--config cfg.json]
   stop --id bitbucket:ws/repo#n [--config cfg.json]
   status [--config cfg.json]
