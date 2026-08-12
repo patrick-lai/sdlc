@@ -69,7 +69,7 @@ At most **3 automatic repair attempts** per PR. Do not repeat the same fingerpri
 
 ### Provider reads
 
-- GitHub: prefer `gh pr view <url> --json ...`; the adapter's `inspect` command is a credential-free fallback for public PRs.
+- GitHub: prefer `gh pr view <url> --json ...`; the adapter's `inspect` command is a credential-free fallback for public PRs. Supply known branch-protection checks with `--required-checks build,test` (or `githubRequiredChecks` in adapter config); unscoped failures stay informational.
 - Bitbucket: use the authenticated provider API/connector available in the environment.
 - Normalize evidence into the provider-neutral snapshot/envelope documented under `references/`.
 

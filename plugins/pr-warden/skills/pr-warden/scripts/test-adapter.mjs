@@ -29,6 +29,7 @@ import {
   latestReviewStates,
   githubConflictStatus,
   githubCiState,
+  configuredRequiredChecks,
   unknownReviewFacts,
   readScheduledWatch,
 } from './lib/github.mjs'
@@ -172,6 +173,27 @@ test('GitHub CI rollup acts only on identified required checks', () => {
   )
   assert.equal(githubCiState(null, [], ['build']), 'running')
   assert.equal(githubCiState(null, [], []), 'green')
+})
+
+test('required-check config resolves global, repository map, and repository entry', () => {
+  const key = { provider: 'github', workspace: 'Acme', repo: 'App', number: 9 }
+  assert.deepEqual(
+    configuredRequiredChecks({ githubRequiredChecks: [' build ', 'test', 'build'] }, key),
+    ['build', 'test'],
+  )
+  assert.deepEqual(
+    configuredRequiredChecks({ githubRequiredChecks: { 'acme/app': ['verify'] } }, key),
+    ['verify'],
+  )
+  assert.deepEqual(
+    configuredRequiredChecks({
+      repositories: [
+        { provider: 'github', workspace: 'acme', repo: 'app', requiredChecks: ['ci'] },
+      ],
+    }, key),
+    ['ci'],
+  )
+  assert.equal(configuredRequiredChecks({}, key), null)
 })
 
 test('HTML fallback leaves current review state unknown and non-actionable', () => {
@@ -755,6 +777,39 @@ test('sweep processes fixture dir', () => {
   const body = JSON.parse(res.stdout)
   assert.ok(body.count >= 3)
   assert.equal(body.skill, 'pr-warden')
+})
+
+test('scheduled unreadable watch advances its retry timestamp', () => {
+  const ledger = path.join(tmpRoot, 'unreadable-watch-ledger.json')
+  const cfg = path.join(tmpRoot, 'unreadable-watch-cfg.json')
+  const fixtures = path.join(tmpRoot, 'unreadable-watch-fixtures')
+  fs.mkdirSync(fixtures)
+  fs.copyFileSync(
+    path.join(FIX, 'pr-snapshot.permission.json'),
+    path.join(fixtures, 'permission.json'),
+  )
+  fs.writeFileSync(
+    cfg,
+    JSON.stringify({
+      ledgerPath: ledger,
+      dryRun: true,
+      repositories: [
+        {
+          provider: 'bitbucket',
+          workspace: 'acme',
+          repo: 'payments',
+          number: 410300,
+        },
+      ],
+    }),
+  )
+  const startedAt = Date.now()
+  const res = runAdapter(['sweep', '--fixture-dir', fixtures, '--config', cfg])
+  assert.equal(res.status, 0, res.stderr)
+  const stored = JSON.parse(fs.readFileSync(ledger, 'utf8'))
+  const watch = stored.watches['bitbucket:acme/payments#410300']
+  assert.equal(watch.state, PRWardenState.unreadable)
+  assert.ok(new Date(watch.nextCheckAt).getTime() >= startedAt + Policy.minActiveCheckInterval)
 })
 
 test('digest surfaces risk items only', () => {

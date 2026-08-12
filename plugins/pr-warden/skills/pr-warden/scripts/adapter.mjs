@@ -28,6 +28,7 @@ import {
   gatesFrom,
   mayMerge,
   Policy,
+  PRWardenState,
   DISPLAY_WORD,
   isActionableByAgent,
 } from './lib/policy.mjs'
@@ -56,6 +57,7 @@ import {
   latestReviewStates,
   githubConflictStatus,
   githubCiState,
+  configuredRequiredChecks,
   unknownReviewFacts,
   readScheduledWatch,
 } from './lib/github.mjs'
@@ -124,9 +126,15 @@ function resolveConfig(args) {
     dryRun: true,
     /** Operator site base, e.g. https://jira.example.com — unset ⇒ no Jira evidence URL */
     jiraBaseUrl: null,
+    githubRequiredChecks: null,
     repositories: [],
   }
-  if (!args.config) return defaults
+  const cliRequiredChecks = args['required-checks']
+    ? String(args['required-checks']).split(',').map((name) => name.trim()).filter(Boolean)
+    : null
+  if (!args.config) {
+    return { ...defaults, githubRequiredChecks: cliRequiredChecks }
+  }
   const cfg = readJson(path.resolve(args.config))
   return {
     ...defaults,
@@ -135,6 +143,7 @@ function resolveConfig(args) {
     trustedPaths: cfg.trustedPaths ?? defaults.trustedPaths,
     ledgerPath: path.resolve(cfg.ledgerPath ?? defaults.ledgerPath),
     jiraBaseUrl: cfg.jiraBaseUrl ?? defaults.jiraBaseUrl,
+    githubRequiredChecks: cliRequiredChecks ?? cfg.githubRequiredChecks ?? defaults.githubRequiredChecks,
   }
 }
 
@@ -308,6 +317,20 @@ function envelopePolicyFields(config) {
   }
 }
 
+function advanceUnreadableWatch({ ledger, norm, config, mode }) {
+  if (mode !== 'scheduled' || !norm.key) return
+  const id = keyDescription(norm.key)
+  if (!ledger.watches?.[id]?.enabled) return
+  const nextCheckAt = nextCheck(PRWardenState.unreadable, Date.now(), {
+    activeInterval: Number(config.checkIntervalMinutes ?? 15) * 60 * 1000,
+  })
+  upsertWatch(ledger, id, {
+    state: PRWardenState.unreadable,
+    detail: norm.error ?? 'unreadable',
+    nextCheckAt: new Date(nextCheckAt).toISOString(),
+  })
+}
+
 function runOne({ snap, config, skill, mode, ledger, force = false }) {
   const norm = normalizeSnapshot(snap)
   const auditEvents = []
@@ -363,6 +386,7 @@ function runOne({ snap, config, skill, mode, ledger, force = false }) {
       ],
       actions: [],
     })
+    advanceUnreadableWatch({ ledger, norm, config, mode })
     return { envelope, skipped: false }
   }
 
@@ -387,6 +411,7 @@ function runOne({ snap, config, skill, mode, ledger, force = false }) {
         },
       ],
     })
+    advanceUnreadableWatch({ ledger, norm, config, mode })
     return { envelope, skipped: false }
   }
 
@@ -664,7 +689,7 @@ async function cmdSweep(args) {
     ? fixtures
     : await Promise.all(
         dueWatches(ledger).map((watch) =>
-          readScheduledWatch(watch, readPublicGitHubSnapshot),
+          readScheduledWatch(watch, (link) => readPublicGitHubSnapshot(link, config)),
         ),
       )
 
@@ -789,7 +814,7 @@ async function githubFetch(pathname) {
   return response.json()
 }
 
-async function readGitHubApiSnapshot(link) {
+async function readGitHubApiSnapshot(link, config = {}) {
   const { workspace: owner, repo, number } = link.key
   const base = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
   const pr = await githubFetch(`${base}/pulls/${number}`)
@@ -802,8 +827,10 @@ async function readGitHubApiSnapshot(link) {
   const approvedReviews = states.filter((state) => state === 'APPROVED').length
   const changesRequestedReviews = states.filter((state) => state === 'CHANGES_REQUESTED').length
   const lifecycle = pr.merged_at ? 'merged' : pr.state === 'closed' ? 'declined' : 'open'
+  const requiredCheckNames = configuredRequiredChecks(config, link.key)
+  const requiredCiKnown = lifecycle !== 'open' || Array.isArray(requiredCheckNames)
   const ci = lifecycle === 'open'
-    ? githubCiState(combinedStatus, checkRuns?.check_runs)
+    ? githubCiState(combinedStatus, checkRuns?.check_runs, requiredCheckNames)
     : 'green'
   const observedUnscopedFailure =
     combinedStatus?.state === 'failure' ||
@@ -827,7 +854,7 @@ async function readGitHubApiSnapshot(link) {
       lifecycle,
       isDraft: Boolean(pr.draft),
       ci,
-      requiredCiKnown: lifecycle !== 'open',
+      requiredCiKnown,
       hasConflicts: githubConflictStatus(pr, lifecycle),
       unresolvedTasks: 0,
       reviewStateKnown: true,
@@ -844,7 +871,7 @@ async function readGitHubApiSnapshot(link) {
       operatorActions: [],
       externalGates: [],
       waiting,
-      ignored: observedUnscopedFailure
+      ignored: !requiredCiKnown && observedUnscopedFailure
         ? ['Failing checks observed, but required-check scope is unknown']
         : [],
     },
@@ -891,9 +918,9 @@ async function readGitHubHtmlSnapshot(link) {
   }
 }
 
-async function readPublicGitHubSnapshot(link) {
+async function readPublicGitHubSnapshot(link, config = {}) {
   try {
-    return await readGitHubApiSnapshot(link)
+    return await readGitHubApiSnapshot(link, config)
   } catch (apiError) {
     try {
       return await readGitHubHtmlSnapshot(link)
@@ -918,7 +945,7 @@ async function cmdInspect(args) {
   try {
     const config = { ...resolveConfig(args), dryRun: true }
     const ledger = { version: 1, watches: {}, runs: {} }
-    const snap = await readPublicGitHubSnapshot(parsed.link)
+    const snap = await readPublicGitHubSnapshot(parsed.link, config)
     const { envelope } = runOne({ snap, config, skill: 'pr-warden', mode: 'manual', ledger, force: true })
     envelope.provenance = [{ source: 'mechanical-read', tool: 'GitHub public REST API', at: new Date().toISOString() }]
     console.log(JSON.stringify(envelope, null, 2))
@@ -1037,7 +1064,7 @@ Commands:
   run --fixture <snapshot.json> [--config cfg.json] [--force] [--markdown] [--html [path]]
   sweep --fixture-dir <dir> [--config cfg.json] [--html [path]]
   digest --fixture-dir <dir> [--config cfg.json] [--html [path]]
-  inspect --url <public-github-pr-url> [--config cfg.json]
+  inspect --url <public-github-pr-url> [--config cfg.json] [--required-checks build,test]
   arm --url <github-pr-url> [--config cfg.json]
   stop --id <provider:owner/repo#n> [--config cfg.json]
   status [--config cfg.json]
