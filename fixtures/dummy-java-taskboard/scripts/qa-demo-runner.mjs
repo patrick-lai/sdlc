@@ -89,36 +89,39 @@ async function main() {
   }
 
   const { root, cleanup, playwrightId } = ensureDeps()
-  const { chromium } = loadFrom(root, playwrightId)
-  const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
-  const { showCaption, updateCaption, hideCaption } = await import(pathToFileURL(captionPath).href)
-
-  const format = hasFfmpeg() ? 'mp4' : 'webm'
-  console.log(`[qa-demo] Target: ${BASE_URL}`)
-  console.log(`[qa-demo] Output: ${OUT_DIR} (${format})`)
-
-  const browser = await chromium.launch()
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 720 },
-    recordVideo: { dir: OUT_DIR, size: { width: 1280, height: 720 } },
-  })
-  const page = await context.newPage()
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-
-  const recorder = await recordPage(page, {
-    outputDir: OUT_DIR,
-    chrome: { url: true },
-    cursor: { style: 'pointer', size: 48 },
-    background: {
-      gradient: { from: '#0052CC', to: '#0747A6' },
-      padding: 48,
-      borderRadius: 12,
-    },
-    outputFormat: format,
-    clean: true,
-  })
+  let browser
+  let recorder
 
   try {
+    const { chromium } = loadFrom(root, playwrightId)
+    const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
+    const { showCaption, updateCaption, hideCaption } = await import(pathToFileURL(captionPath).href)
+
+    const format = hasFfmpeg() ? 'mp4' : 'webm'
+    console.log(`[qa-demo] Target: ${BASE_URL}`)
+    console.log(`[qa-demo] Output: ${OUT_DIR} (${format})`)
+
+    browser = await chromium.launch()
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      recordVideo: { dir: OUT_DIR, size: { width: 1280, height: 720 } },
+    })
+    const page = await context.newPage()
+    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+
+    recorder = await recordPage(page, {
+      outputDir: OUT_DIR,
+      chrome: { url: true },
+      cursor: { style: 'pointer', size: 48 },
+      background: {
+        gradient: { from: '#0052CC', to: '#0747A6' },
+        padding: 48,
+        borderRadius: 12,
+      },
+      outputFormat: format,
+      clean: true,
+    })
+
     // Title beat
     await showCaption(page, 'QA: Java Task Board dummy fixture')
     await hideCursor(page)
@@ -190,13 +193,13 @@ async function main() {
   } catch (err) {
     console.error('[qa-demo] FAIL — keeping partial output if any')
     try {
-      await recorder.stop()
+      await recorder?.stop()
     } catch {
       // ignore
     }
     throw err
   } finally {
-    await browser.close().catch(() => {})
+    if (browser) await browser.close().catch(() => {})
     if (cleanup) rmSync(root, { recursive: true, force: true })
   }
 }
