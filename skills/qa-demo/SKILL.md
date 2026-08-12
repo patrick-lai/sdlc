@@ -95,7 +95,7 @@ Polish defaults (see [references/testreel.md](references/testreel.md)):
   "cursor": { "style": "pointer", "size": 48 },
   "chrome": { "url": true },
   "background": {
-    "gradient": { "from": "#0f172a", "to": "#1e3a5f" },
+    "gradient": { "from": "#0052CC", "to": "#0747A6" },
     "padding": 48,
     "borderRadius": 12
   },
@@ -170,7 +170,7 @@ Caption element id is always `__sdlc_caption`. Style guidelines live in the help
      outputDir: './testreel-output',
      chrome: { url: true },
      background: {
-       gradient: { from: '#0f172a', to: '#1e3a5f' },
+       gradient: { from: '#0052CC', to: '#0747A6' },
        padding: 48,
        borderRadius: 12,
      },
