@@ -1,0 +1,40 @@
+{
+  "name": "@patrick-lai/sdlc",
+  "version": "0.1.0",
+  "description": "SDLC agent skills for Claude Code and Codex — install with npx skills add patrick-lai/sdlc",
+  "license": "MIT",
+  "type": "module",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patrick-lai/sdlc.git"
+  },
+  "homepage": "https://github.com/patrick-lai/sdlc#readme",
+  "bugs": {
+    "url": "https://github.com/patrick-lai/sdlc/issues"
+  },
+  "keywords": [
+    "agent-skills",
+    "claude-code",
+    "codex",
+    "sdlc",
+    "qa",
+    "testreel",
+    "storybook",
+    "playwright",
+    "demo"
+  ],
+  "files": [
+    "skills",
+    "plugins",
+    ".claude-plugin",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "smoke:testreel": "node skills/qa-demo/scripts/smoke-testreel.mjs"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "name": "sdlc",
+  "owner": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "metadata": {
+    "description": "SDLC agent skills for Claude Code — QA demos, TestReel walkthroughs, and more",
+    "version": "0.1.0",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "qa-demo",
+      "source": "./plugins/qa-demo",
+      "description": "Boot Storybook/e2e/app preview, prove a PR or feature end-to-end, and record a narrated TestReel video with on-screen captions",
+      "version": "0.1.0",
+      "author": {
+        "name": "Patrick Lai",
+        "url": "https://github.com/patrick-lai"
+      },
+      "repository": "https://github.com/patrick-lai/sdlc",
+      "license": "MIT",
+      "keywords": [
+        "qa",
+        "testreel",
+        "storybook",
+        "playwright",
+        "demo",
+        "pr-review"
+      ],
+      "category": "testing",
+      "tags": [
+        "qa",
+        "demo",
+        "testreel",
+        "storybook",
+        "e2e"
+      ],
+      "skills": [
+        "./skills/qa-demo"
+      ]
+    }
+  ]
+}
