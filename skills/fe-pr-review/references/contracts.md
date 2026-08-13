@@ -14,7 +14,7 @@ The `rollout-gates` result additionally requires `gateRequirement`: `required`, 
 
 ## Synthesis
 
-The synthesizer returns `{ "blocking": [], "nonBlocking": [], "unverified": [], "verdict", "rationale" }`. It deduplicates by root cause, rejects speculation, preserves disconfirming evidence, caps blocking findings at five, and uses inspected evidence only. `verdict` is `blocked`, `passable`, or `unverified`; it is advice, not a provider action.
+The synthesizer returns `{ "blocking": [], "nonBlocking": [], "unverified": [], "operationalFollowUps": [], "verdict", "rationale" }`. `operationalFollowUps` holds human/process work that does not affect the code verdict: routine owner checklists, QA tasks, rollout communication, and post-merge archive work. Such items block only when they carry concrete unresolved correctness/safety evidence or an explicit mandatory pre-approval policy. It deduplicates by root cause, rejects speculation, preserves disconfirming evidence, caps blocking findings at five, and uses inspected evidence only. `verdict` is `blocked`, `passable`, or `unverified`; it is advice, not a provider action.
 
 ## QA evidence
 
