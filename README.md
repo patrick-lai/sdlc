@@ -17,6 +17,7 @@ npx skills add patrick-lai/sdlc
 | **review** | Review a working tree, current/own PR, explicit PR, or arbitrary branch; automatically route to frontend, backend, or both and return one verdict. |
 | **fe-pr-review** | Fan out 3–6 read-only frontend review personas, synthesize their evidence, and fold in a `qa-demo` run without depending on one forge or model vendor. |
 | **be-pr-review** | Fan out 3–6 backend reviewers across contracts, data, reliability, security, performance, tests, and rollout, then adversarially synthesize revision-bound evidence. |
+| **second-opinion** | Cheap native-model second look at the current change via the host agent's own subagent. Explicit `/second-opinion`, or implicit when `AGENTS.md` says to use it for all sessions. |
 
 ## Install
 
@@ -38,6 +39,7 @@ npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
 npx skills add patrick-lai/sdlc --skill fe-pr-review -a cursor -y
 npx skills add patrick-lai/sdlc --skill be-pr-review -a cursor -y
 npx skills add patrick-lai/sdlc --skill review -a cursor -y
+npx skills add patrick-lai/sdlc --skill second-opinion -a cursor -y
 # equivalent project root for codex-only auto-detect:
 # npx skills add patrick-lai/sdlc --skill pr-warden -a codex -y
 
@@ -64,6 +66,7 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 /plugin install fe-pr-review@sdlc
 /plugin install be-pr-review@sdlc
 /plugin install review@sdlc
+/plugin install second-opinion@sdlc
 ```
 
 ## review
@@ -109,6 +112,32 @@ The dependency-free graph runner snapshots one immutable head, chooses 3–6 bac
 node .agents/skills/be-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main
 node .agents/skills/be-pr-review/scripts/review-graph.mjs run --repo-root "$PWD" --base origin/main --dry-run
 npm run test:be-pr-review
+```
+
+## second-opinion
+
+Install it, then either invoke it or arm it for every session:
+
+```bash
+npx skills add patrick-lai/sdlc --skill second-opinion -a cursor -y
+```
+
+```text
+/second-opinion
+/second-opinion on
+/second-opinion off
+```
+
+Put this in a global or repo `AGENTS.md` so every session that loads that file auto-runs after qualifying edits:
+
+```text
+Use /second-opinion for all sessions.
+```
+
+The parent stays the implementer. The reviewer is a fresh read-only subagent on this host's cheap native model (Cursor prefers `gpt-5.6-luna`; Claude Code uses `haiku`; Codex stays on a Codex-native id). No cross-vendor spawn. Findings are `concern` / `blocker` only; the parent chooses ACCEPT or DISMISS.
+
+```bash
+npm run test:skills
 ```
 
 ## pr-warden
@@ -183,22 +212,21 @@ skills/pr-warden/               # canonical PR Warden pack + adapter
 skills/fe-pr-review/             # frontend review graph + provider-neutral runners
 skills/be-pr-review/             # backend review graph + adversarial synthesis
 skills/review/                   # unified target resolver + FE/BE router
+skills/second-opinion/           # native-host cheap second look
 plugins/qa-demo/                # Claude Code plugin package
 plugins/pr-warden/              # Claude Code plugin package
 plugins/fe-pr-review/            # Claude Code plugin package
 plugins/be-pr-review/            # Claude Code plugin package
 plugins/review/                  # Claude Code unified review plugin
+plugins/second-opinion/          # Claude Code plugin + /second-opinion + haiku agent
 .claude-plugin/marketplace.json # marketplace catalog
 ```
 
-Canonical skills live under `skills/`. After editing, refresh plugin mirrors:
+Canonical skills live under `skills/`. After editing, refresh plugin mirrors (skill trees **and** the second-opinion Claude agent body, which is a second copy of `references/reviewer.md`):
 
 ```bash
-rm -rf plugins/qa-demo/skills/qa-demo && cp -a skills/qa-demo plugins/qa-demo/skills/qa-demo
-rm -rf plugins/pr-warden/skills/pr-warden && cp -a skills/pr-warden plugins/pr-warden/skills/pr-warden
-rm -rf plugins/fe-pr-review/skills/fe-pr-review && cp -a skills/fe-pr-review plugins/fe-pr-review/skills/fe-pr-review
-rm -rf plugins/be-pr-review/skills/be-pr-review && cp -a skills/be-pr-review plugins/be-pr-review/skills/be-pr-review
-rm -rf plugins/review/skills/review && cp -a skills/review plugins/review/skills/review
+npm run sync:plugins
+# or: node scripts/sync-plugin-mirrors.mjs
 ```
 
 ## Links

@@ -32,7 +32,7 @@ function assertMirror(name) {
   }
 }
 
-for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review']) assertMirror(name)
+for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion']) assertMirror(name)
 
 const publicRoots = ['README.md', '.claude-plugin', 'skills', 'plugins', 'fixtures']
 const textExtensions = new Set(['.md', '.json', '.mjs', '.js', '.html', '.txt', '.yaml', '.yml'])
@@ -226,7 +226,7 @@ assert.equal(Object.keys(pkg.devDependencies || {}).length, 0, 'skills must stay
 // Marketplace entries must resolve to a real plugin with a matching manifest.
 const marketplace = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin/marketplace.json'), 'utf8'))
 const marketplaceNames = marketplace.plugins.map((entry) => entry.name)
-for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review']) {
+for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion']) {
   assert.ok(marketplaceNames.includes(name), `marketplace missing plugin ${name}`)
   const entry = marketplace.plugins.find((plugin) => plugin.name === name)
   assert.equal(entry.source, `./plugins/${name}`)
@@ -239,9 +239,74 @@ for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'rev
   assert.ok(fs.existsSync(path.join(root, 'plugins', name, 'skills', name, 'SKILL.md')))
 }
 
+const secondOpinion = fs.readFileSync(path.join(root, 'skills/second-opinion/SKILL.md'), 'utf8')
+for (const marker of [
+  '/second-opinion',
+  'all sessions',
+  'second-opinion: always',
+  'native subagent',
+  'No other vendor',
+  'read-only',
+  'ACCEPT',
+  'DISMISS',
+  '<<<SECOND_OPINION',
+  'implicit',
+  'FAILED',
+  'fe-pr-review',
+  'Never arm from this skill',
+  'truncated:',
+  '~1500 diff lines',
+]) {
+  assert.ok(secondOpinion.includes(marker), `second-opinion missing public contract: ${marker}`)
+}
+
+const reviewer = fs.readFileSync(path.join(root, 'skills/second-opinion/references/reviewer.md'), 'utf8')
+for (const marker of [
+  'bug/gap detector',
+  '<<<SECOND_OPINION',
+  'at most five',
+  'untrusted data',
+  '{"findings":[]}',
+  'truncated:',
+  'cannot run `git`',
+  'neither a diff nor a file list',
+]) {
+  assert.ok(reviewer.includes(marker), `second-opinion reviewer missing: ${marker}`)
+}
+
+const hosts = fs.readFileSync(path.join(root, 'skills/second-opinion/references/hosts.md'), 'utf8')
+for (const marker of ['cursor-agent', 'codex exec', 'permission-mode plan', 'another vendor', 'gpt-5.6-luna', 'haiku']) {
+  assert.ok(hosts.includes(marker), `second-opinion hosts missing: ${marker}`)
+}
+
+const agentPath = path.join(root, 'plugins/second-opinion/agents/second-opinion.md')
+assert.ok(fs.existsSync(agentPath), 'missing Claude agent for second-opinion')
+const agent = fs.readFileSync(agentPath, 'utf8')
+const agentBody = agent.replace(/^---[\s\S]*?---\n/, '')
+assert.equal(agentBody, reviewer, 'Claude agent body must match references/reviewer.md')
+assert.ok(agent.includes('model: haiku'), 'Claude agent must stay on haiku')
+assert.ok(fs.existsSync(path.join(root, 'plugins/second-opinion/commands/second-opinion.md')), 'missing /second-opinion command')
+
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8')
 for (const marker of ['fe-pr-review', 'npm run test:fe-pr-review', 'plugins/fe-pr-review', 'be-pr-review', 'npm run test:be-pr-review', 'plugins/be-pr-review', '/review', 'plugins/review']) {
   assert.ok(readme.includes(marker), `README missing public skill reference: ${marker}`)
 }
+for (const marker of [
+  'second-opinion',
+  'plugins/second-opinion',
+  'Use /second-opinion for all sessions',
+  'scripts/sync-plugin-mirrors.mjs',
+  'npm run sync:plugins',
+]) {
+  assert.ok(readme.includes(marker), `README missing second-opinion reference: ${marker}`)
+}
+
+assert.ok(fs.existsSync(path.join(root, 'scripts/sync-plugin-mirrors.mjs')), 'missing sync-plugin-mirrors.mjs')
+assert.ok(pkg.scripts['sync:plugins'], 'package.json missing script sync:plugins')
+const syncSrc = fs.readFileSync(path.join(root, 'scripts/sync-plugin-mirrors.mjs'), 'utf8')
+assert.ok(
+  /existsSync\(src\)[\s\S]*rmSync\(dest/.test(syncSrc),
+  'sync-plugin-mirrors must verify the canonical skill exists before deleting the plugin mirror',
+)
 
 console.log('PASS: public skill contracts, mirrors, packaging, and internal-leak guard')

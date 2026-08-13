@@ -1,0 +1,19 @@
+{
+  "name": "second-opinion",
+  "description": "Cheap native-model second-opinion review via the host agent's own subagent. Explicit /second-opinion or implicit when AGENTS.md says to use it for all sessions.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "repository": "https://github.com/patrick-lai/sdlc",
+  "license": "MIT",
+  "keywords": [
+    "review",
+    "second-opinion",
+    "subagent",
+    "cursor",
+    "codex",
+    "claude"
+  ]
+}

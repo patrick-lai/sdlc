@@ -34,7 +34,8 @@
     "reliability-review",
     "review",
     "code-review",
-    "full-stack-review"
+    "full-stack-review",
+    "second-opinion"
   ],
   "files": [
     "skills",
@@ -49,6 +50,7 @@
   "scripts": {
     "smoke:install": "node scripts/smoke-install.mjs",
     "smoke:testreel": "node skills/qa-demo/scripts/smoke-testreel.mjs",
+    "sync:plugins": "node scripts/sync-plugin-mirrors.mjs",
     "test:skills": "node scripts/test-skill-contracts.mjs",
     "test:pr-warden": "node skills/pr-warden/scripts/test-adapter.mjs",
     "pr-warden": "node skills/pr-warden/scripts/adapter.mjs",

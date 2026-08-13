@@ -5,7 +5,7 @@
     "url": "https://github.com/patrick-lai"
   },
   "metadata": {
-    "description": "SDLC agent skills for Claude Code \u2014 QA demos, portable PR Warden, and more",
+    "description": "SDLC agent skills for Claude Code — QA demos, portable PR Warden, and more",
     "version": "0.5.0",
     "pluginRoot": "./plugins"
   },
@@ -165,6 +165,35 @@
       ],
       "skills": [
         "./skills/review"
+      ]
+    },
+    {
+      "name": "second-opinion",
+      "source": "./plugins/second-opinion",
+      "description": "Cheap native-model second-opinion review via the host agent's own subagent. Explicit /second-opinion or implicit when AGENTS.md says to use it for all sessions.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Patrick Lai",
+        "url": "https://github.com/patrick-lai"
+      },
+      "repository": "https://github.com/patrick-lai/sdlc",
+      "license": "MIT",
+      "keywords": [
+        "review",
+        "second-opinion",
+        "subagent",
+        "cursor",
+        "codex",
+        "claude"
+      ],
+      "category": "productivity",
+      "tags": [
+        "review",
+        "second-opinion",
+        "subagent"
+      ],
+      "skills": [
+        "./skills/second-opinion"
       ]
     }
   ]
