@@ -348,16 +348,21 @@ export function qaEvidence(file, h0) {
   try {
     const content = fs.readFileSync(path.resolve(file), 'utf8')
     let revision = null
+    let result = null
     try {
       const parsed = JSON.parse(content)
       revision = parsed?.revision || parsed?.head || parsed?.h0 || null
+      result = parsed?.result || parsed?.verdict || null
     } catch {
       // Markdown reports may declare the tested revision on a labelled line.
       revision = content.match(/^\s*(?:[-*]\s*)?(?:revision|commit|head|h0)\s*[:=]\s*`?([0-9a-f]{7,40})`?\s*$/im)?.[1] || null
+      result = content.match(/^\s*(?:[-*]\s*)?(?:result|verdict)\s*[:=]\s*`?([A-Za-z_]+)`?\s*$/im)?.[1] || null
     }
     if (typeof revision !== 'string' || !revision.trim()) revision = null
+    if (typeof result === 'string' && result.trim()) result = result.trim().toUpperCase()
+    else result = null
     const status = revision && revision !== h0 ? 'stale' : revision ? 'fresh' : 'unverified'
-    return { status, revision, hash: sha256(content), path: path.resolve(file), content }
+    return { status, revision, result, hash: sha256(content), path: path.resolve(file), content }
   } catch (error) { return { status: 'unverified', error: String(error.message).slice(0, 300) } }
 }
 

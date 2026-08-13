@@ -70,6 +70,11 @@ try {
   const fresh = path.join(temp, 'qa.json')
   fs.writeFileSync(fresh, JSON.stringify({ revision: 'head-1', result: 'PASS' }))
   assert.equal(qaEvidence(fresh, 'head-1').status, 'fresh')
+  assert.equal(qaEvidence(fresh, 'head-1').result, 'PASS')
+  const failedFresh = path.join(temp, 'qa-fail.json')
+  fs.writeFileSync(failedFresh, JSON.stringify({ revision: 'head-1', result: 'FAIL' }))
+  assert.equal(qaEvidence(failedFresh, 'head-1').status, 'fresh')
+  assert.equal(qaEvidence(failedFresh, 'head-1').result, 'FAIL')
   assert.equal(qaEvidence(fresh, 'head-2').status, 'stale')
   const unverifiable = path.join(temp, 'qa.md')
   fs.writeFileSync(unverifiable, '# QA report\nNo machine-readable revision')
@@ -220,6 +225,16 @@ try {
   assert.ok(!report.html.includes('__FE_REVIEW_REPORT_JSON__'))
   assert.ok(report.html.includes('Every review facet'))
   assert.ok(report.html.includes('Executive summary'))
+  const failExec = buildReportDocument({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'clear' },
+    qa: { status: 'fresh', revision: head, result: 'FAIL', reason: 'Assertions failed' },
+    nodeResults: [],
+    selected: [],
+    coverage: [],
+  })
+  assert.ok(!failExec.executive.bullets.some((line) => /passed/i.test(line)), 'fresh FAIL QA must not read as passed')
+  assert.ok(failExec.executive.bullets.some((line) => /failed/i.test(line)))
   const duplicateDoc = buildReportDocument({
     snapshot: { h0: head, base: 'base', diffHash: 'hash' },
     synthesis: {

@@ -75,8 +75,14 @@ function buildExecutiveSummary({ verdict, counts, qa, featureGate, findings, fai
   } else if (featureGate.status === 'unverified') {
     bullets.push('Feature-gate requirement is unverified — rollout safety is not established.')
   }
-  if (qa.status === 'fresh') bullets.push('Visual QA passed on this head (H0).')
-  else if (qa.status === 'not-run') bullets.push('Visual QA was not run for this head.')
+  if (qa.status === 'fresh') {
+    const outcome = qa.result ? String(qa.result).toUpperCase() : null
+    if (outcome === 'PASS') bullets.push('Visual QA passed on this head (H0).')
+    else if (outcome === 'FAIL') bullets.push('Visual QA failed on this head (H0).')
+    else if (outcome === 'PARTIAL') bullets.push('Visual QA is partial on this head (H0) — not full proof.')
+    else if (outcome === 'BLOCKED') bullets.push('Visual QA was blocked on this head (H0).')
+    else bullets.push('Visual QA report is fresh for this head (H0); see QA section for outcome.')
+  } else if (qa.status === 'not-run') bullets.push('Visual QA was not run for this head.')
   else bullets.push(`Visual QA is ${qa.status} — visual proof cannot be relied on.`)
 
   if (failedNodes?.length) {
@@ -196,6 +202,7 @@ export function buildReportDocument({
   const qaDoc = {
     status: qa?.status || 'not-run',
     revision: qa?.revision || null,
+    result: qa?.result || null,
     hash: qa?.hash || null,
     reason:
       qa?.reason ||
@@ -333,6 +340,7 @@ export function buildReviewMarkdown(document) {
     '## QA evidence',
     '',
     `- **Status:** ${d.qa.status}`,
+    `- **Result:** ${d.qa.result || 'not recorded'}`,
     `- **Revision:** ${d.qa.revision || 'not established'}`,
     `- **Artifact hash:** ${d.qa.hash || 'none'}`,
     `- **Reason / limitation:** ${d.qa.reason}`,

@@ -1246,6 +1246,7 @@
             el('p', { style: 'margin:0;color:var(--muted)' }, [data.qa?.reason || '']),
           ])
           const meta = el('div', { class: 'meta-row', style: 'margin-top:10px' })
+          meta.appendChild(metaChip('Result', data.qa?.result || 'not recorded', null, false))
           meta.appendChild(metaChip('Revision', data.qa?.revision || 'not established', null, false))
           meta.appendChild(metaChip('Artifact hash', data.qa?.hash || 'none', null, false))
           section.appendChild(banner)
