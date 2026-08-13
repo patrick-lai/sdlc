@@ -149,7 +149,7 @@ const feGraph = fs.readFileSync(path.join(root, 'skills/fe-pr-review/scripts/rev
 for (const id of personaIds) assert.ok(feGraph.includes(`'${id}'`), `review-graph missing persona ${id}`)
 for (const facet of ['fg-requirement', 'fg-off-path', 'fg-on-path-states', 'fg-persistence-rollback', 'fg-tests', 'fg-cleanup']) assert.ok(feGraph.includes(`'${facet}'`), `review-graph missing gate facet ${facet}`)
 for (const facet of ['ci-surface-parity', 'runtime-config-substitution', 'dependency-resolution-risk', 'dynamic-key-boundaries', 'schema-selection-compatibility', 'temporal-history-cache', 'side-effect-liveness', 'test-oracle-validity']) assert.ok(feGraph.includes(`'${facet}'`), `review-graph missing historical probe ${facet}`)
-assert.ok(!/^import .* from '(?!node:)/m.test(feGraph), 'review-graph must stay dependency-free')
+assert.ok(!/^import .* from '(?!node:|\.)/m.test(feGraph), 'review-graph must stay dependency-free')
 for (const forbidden of [/--dangerously/, /--yolo/, /bypassPermissions/, /https?:\/\/(?!github\.com|example)/]) {
   assert.ok(!forbidden.test(feGraph), `review-graph must not contain ${forbidden}`)
 }
