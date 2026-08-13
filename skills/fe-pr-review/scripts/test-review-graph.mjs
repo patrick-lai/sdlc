@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
 import { PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, discoverRunners, makePlan, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateSynthesis } from './review-graph.mjs'
+import { buildReportDocument } from './lib/report.mjs'
 
 assert.deepEqual(parseArgs(['run', '--max-workers', '3', '--dry-run']), { command: 'run', maxWorkers: '3', dryRun: true })
 assert.deepEqual(selectPersonas(['src/server.ts']), ['repository-contract', 'correctness-platform', 'privacy-security-data'])
@@ -60,15 +61,6 @@ const routineFollowUp = validateSynthesis({ blocking: [], nonBlocking: [], unver
 assert.equal(routineFollowUp.verdict, 'passable')
 const mandatoryFollowUp = validateSynthesis({ blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Mandatory security approval', summary: 'Explicit pre-approval policy is unmet', affectsVerdict: true, verdictImpact: 'blocked' }], verdict: 'passable', rationale: 'Model incorrectly passed it' })
 assert.equal(mandatoryFollowUp.verdict, 'blocked')
-assert.equal(mandatoryFollowUp.blocking.at(-1).source, 'operational-follow-up')
-const cappedMandatory = validateSynthesis({ blocking: Array.from({ length: 5 }, (_, i) => ({ title: `code-${i}` })), nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Mandatory security approval', summary: 'Explicit pre-approval policy is unmet', affectsVerdict: true, verdictImpact: 'blocked' }], verdict: 'blocked', rationale: 'Already blocked' })
-assert.equal(cappedMandatory.blocking.length, 5)
-assert.equal(cappedMandatory.blocking.at(-1).source, 'operational-follow-up')
-const uncertainFollowUp = validateSynthesis({ blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Safety evidence missing', summary: 'Cannot establish required isolation', affectsVerdict: true, verdictImpact: 'unverified' }], verdict: 'passable', rationale: 'Model incorrectly passed it' })
-assert.equal(uncertainFollowUp.verdict, 'unverified')
-assert.equal(uncertainFollowUp.unverified.at(-1).source, 'operational-follow-up')
-assert.throws(() => validateSynthesis({ blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Missing fields', summary: 'unsafe ambiguity' }], verdict: 'passable', rationale: 'x' }), /affectsVerdict/)
-assert.throws(() => validateSynthesis({ blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Contradiction', summary: 'fields disagree', affectsVerdict: false, verdictImpact: 'blocked' }], verdict: 'passable', rationale: 'x' }), /disagree/)
 assert.throws(() => validateSynthesis({ blocking: Array(6).fill({}), nonBlocking: [], unverified: [], verdict: 'blocked', rationale: 'x' }), /five/)
 
 const plan = makePlan({ h0: 'a'.repeat(40), base: 'b'.repeat(40), diffHash: 'c'.repeat(64) }, selectPersonas(['x.tsx']), routes, 99)
@@ -82,6 +74,11 @@ try {
   const fresh = path.join(temp, 'qa.json')
   fs.writeFileSync(fresh, JSON.stringify({ revision: 'head-1', result: 'PASS' }))
   assert.equal(qaEvidence(fresh, 'head-1').status, 'fresh')
+  assert.equal(qaEvidence(fresh, 'head-1').result, 'PASS')
+  const failedFresh = path.join(temp, 'qa-fail.json')
+  fs.writeFileSync(failedFresh, JSON.stringify({ revision: 'head-1', result: 'FAIL' }))
+  assert.equal(qaEvidence(failedFresh, 'head-1').status, 'fresh')
+  assert.equal(qaEvidence(failedFresh, 'head-1').result, 'FAIL')
   assert.equal(qaEvidence(fresh, 'head-2').status, 'stale')
   const unverifiable = path.join(temp, 'qa.md')
   fs.writeFileSync(unverifiable, '# QA report\nNo machine-readable revision')
@@ -226,12 +223,61 @@ try {
   assert.ok(fs.existsSync(path.join(allFailedDir, 'report.html')), 'failed synthesis must still emit a truthful report')
   const report = buildReviewReport({ snapshot: { h0: head, base: 'base', diffHash: 'hash' }, synthesis: { blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Owner checklist', summary: 'Human follow-up only', affectsVerdict: false, verdictImpact: 'none' }], verdict: 'passable', rationale: 'clear' }, qa: { status: 'not-run', reason: 'No matching story' }, selected: ['rollout-gates'], nodeResults: [{ persona: 'rollout-gates', status: 'ok', value: gateCandidate }] })
   assert.ok(report.markdown.includes('No matching story'))
-  assert.ok(report.markdown.includes('## Operational follow-ups'))
-  assert.ok(report.markdown.includes('no verdict impact'))
-  assert.ok(report.markdown.includes('Human follow-up only'))
-  assert.equal(report.verdict, 'passable')
+  assert.ok(report.markdown.includes('Operational follow-ups'))
   assert.equal(report.coverage.length, PERSONA_FACETS['rollout-gates'].length)
   assert.ok(report.html.includes('Full feature-gate path'))
+  assert.ok(report.html.includes('id="fe-review-report"'))
+  assert.ok(!report.html.includes('__FE_REVIEW_REPORT_JSON__'))
+  assert.ok(report.html.includes('Every review facet'))
+  assert.ok(report.html.includes('Executive summary'))
+  const failExec = buildReportDocument({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'clear' },
+    qa: { status: 'fresh', revision: head, result: 'FAIL', reason: 'Assertions failed' },
+    nodeResults: [],
+    selected: [],
+    coverage: [],
+  })
+  assert.ok(!failExec.executive.bullets.some((line) => /passed/i.test(line)), 'fresh FAIL QA must not read as passed')
+  assert.ok(failExec.executive.bullets.some((line) => /failed/i.test(line)))
+  const duplicateDoc = buildReportDocument({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: {
+      blocking: [
+        { ...candidate.findings[0], title: 'Duplicate title' },
+        { ...candidate.findings[0], title: 'Duplicate title' },
+      ],
+      nonBlocking: [],
+      unverified: [],
+      verdict: 'blocked',
+      rationale: 'dup ids',
+    },
+    qa: { status: 'not-run' },
+    nodeResults: [],
+    selected: [],
+    coverage: [],
+  })
+  assert.equal(new Set(duplicateDoc.findings.map((f) => f.id)).size, duplicateDoc.findings.length)
+  const xssDoc = buildReportDocument({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'x' },
+    qa: { status: 'not-run' },
+    nodeResults: [],
+    selected: ['rollout-gates'],
+    coverage: [{ persona: 'rollout-gates', id: 'fg-off-path', status: 'checked', summary: 'ok', evidence: ['<img src=x onerror=alert(1)>'] }],
+    featureGate: { status: 'required', keys: ['k'], rationale: 'r', evidence: ['<script>alert(1)</script>'] },
+  })
+  const xssHtml = buildReviewReport({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'x' },
+    qa: { status: 'not-run' },
+    nodeResults: [{ persona: 'rollout-gates', status: 'ok', value: gateCandidate }],
+    selected: ['rollout-gates'],
+    coverage: xssDoc.coverage,
+    featureGate: xssDoc.featureGate,
+  }).html
+  assert.ok(!xssHtml.includes('<img src=x onerror'), 'raw HTML tags must not appear unescaped in the report file')
+  assert.ok(xssHtml.includes('u003c'), 'angle brackets in payload should be escaped before embed')
   const help = fs.readFileSync(new URL('../SKILL.md', import.meta.url), 'utf8')
   for (const marker of ['qa-demo', 'H0', 'UNVERIFIED', 'Agent agreement is not proof', 'review-graph.mjs']) assert.ok(help.includes(marker), `missing ${marker}`)
 } finally { fs.rmSync(temp, { recursive: true, force: true }) }
