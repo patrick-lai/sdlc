@@ -9,14 +9,16 @@
   - Active filter shows the empty state after completion
   - Empty-title validation is visible
   - Viewer-facing captions appear on every major beat
+  - Axe-core scanned 5 major UI states with 0 violations
 - **Boot method:** `python3 -m http.server 8877 --directory fixtures/dummy-java-taskboard/public`
 - **Result:** **PASS**
 - **Artifacts:**
-  - Video: `testreel-output/demo/recording-2026-08-13_04-50-24-092.mp4`
-  - Screenshot: `testreel-output/demo/final-2026-08-13_04-50-23-766.png`
+  - Video: `testreel-output/demo/recording-2026-08-13_09-57-54-417.mp4`
+  - Screenshot: `testreel-output/demo/final-2026-08-13_09-57-54-097.png`
+  - Accessibility: `testreel-output/demo/a11y-summary.json` (5 scans, 0 violations)
   - Caption contact sheet: `testreel-output/demo/contact-sheet.jpg`
 - **Runner:** `scripts/qa-demo-runner.mjs` (TestReel `recordPage` + skill `caption-overlay.mjs`)
-- **Video evidence:** 22.40 seconds, 3,783,122 bytes, MP4 post-processing succeeded.
+- **Video evidence:** 22.40 seconds, 3,839,257 bytes, MP4 post-processing succeeded.
 - **Revision:** `12a6986-dirty` (rebased working tree used for pre-commit proof)
 - **Public safety:** The fixture, captions, and report contain no private service, customer, or repository data.
 - **Residual risk:** Java sources are the domain contract; the recorded static UI is their browser-facing mirror.

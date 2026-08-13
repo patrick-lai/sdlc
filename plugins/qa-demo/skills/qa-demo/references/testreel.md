@@ -7,7 +7,7 @@ TestReel records Playwright-driven demos to WebM / MP4 / GIF with animated curso
 ## Install
 
 ```bash
-npm install testreel playwright
+npm install testreel playwright axe-core
 npx playwright install chromium
 ```
 

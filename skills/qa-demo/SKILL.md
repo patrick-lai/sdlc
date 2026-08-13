@@ -11,7 +11,7 @@ description: >
 
 # qa-demo
 
-Produce a **viewer-facing proof** that a PR/feature works: boot the right surface, walk the happy path (+ 1–2 proof moments), assert critical UI states, and deliver a polished [TestReel](https://github.com/greentfrapp/testreel) video with **on-screen narration captions** on every major beat.
+Produce a **viewer-facing proof** that a PR/feature works: boot the right surface, walk the happy path (+ 1–2 proof moments), assert critical UI states, and deliver a polished [TestReel](https://github.com/greentfrapp/testreel) video with **on-screen narration captions** on every major beat, and run **axe-core accessibility scans** on every major asserted UI state.
 
 TestReel has **no built-in caption action**. You MUST inject DOM caption banners via Playwright `page.evaluate` (use `scripts/caption-overlay.mjs`) between steps, and use `hideCursor` / `showCursor` plus waits for “explain this moment” beats.
 
@@ -92,7 +92,8 @@ Map the PR/feature to a **viewer-facing walkthrough**:
 1. **Title beat** — what PR/feature this proves
 2. **Happy path** — primary user flow (3–8 interaction beats)
 3. **1–2 proof/edge moments** — empty state, validation error, disabled → enabled, before/after, etc.
-4. **Result beat** — closing “what we proved” caption
+4. **Accessibility checkpoints** — scan the initial state and each materially changed state after its Playwright assertions
+5. **Result beat** — closing “what we proved” caption
 
 Write either:
 
@@ -161,7 +162,7 @@ Caption element id is always `__sdlc_caption`. Position: bottom-left lower-third
 
    ```bash
    scratch=$(mktemp -d)
-   npm install --prefix "$scratch" testreel playwright
+   npm install --prefix "$scratch" testreel playwright axe-core
    npm exec --prefix "$scratch" -- playwright install chromium
    ```
 
@@ -226,9 +227,17 @@ Validate the toolchain anytime with the bundled smoke:
 ```bash
 # from this skill directory (or repo root via npm run smoke:testreel)
 node scripts/smoke-testreel.mjs
+
+# Custom target: auto-detects TodoMVC/example.com, otherwise generic navigation mode
+SDLC_SMOKE_URL=http://127.0.0.1:4173 node scripts/smoke-testreel.mjs
+
+# Force target-specific interactions when the URL does not identify the app
+SDLC_SMOKE_URL=http://127.0.0.1:4173 SDLC_SMOKE_MODE=todomvc node scripts/smoke-testreel.mjs
 ```
 
-### 7. Prove
+`SDLC_SMOKE_MODE` accepts `todomvc`, `example`, or `generic`. The bundled smoke is a toolchain diagnostic: it prints PASS or PARTIAL for its target, but a PARTIAL smoke is never product proof. Deliverable runners must enforce the blocking policy in §7.
+
+### 7. Prove interactions and accessibility
 
 Assert critical UI states with Playwright expects / visible selectors (in the runner or a companion check):
 
@@ -236,10 +245,32 @@ Assert critical UI states with Playwright expects / visible selectors (in the ru
 - Happy-path outcome is on screen (toast, list item, enabled button, URL change)
 - Edge/proof moment behaves as claimed
 
+Accessibility is required for visual demos:
+
+1. Load `axe-core` from the scratch dependencies and import `scanAccessibility`, `mergeAccessibilityScans`, and `assertNoBlockingViolations` from `scripts/a11y-scan.mjs`.
+2. Scan the initial rendered state and every major state after its interaction assertions. Exclude only qa-demo's injected `#__sdlc_caption`; do not exclude product UI to make a scan pass.
+3. Write the merged result to `a11y-summary.json`. Deduplicate violations by rule while preserving story/state IDs and affected nodes.
+4. Treat `critical` or `serious` violations as blocking. Report `moderate` and `minor` violations without hiding them.
+5. If axe-core cannot run, the overall visual QA verdict cannot be PASS: use PARTIAL when interactions passed, or BLOCKED when no meaningful proof completed.
+
+```js
+const axeSource = loadFrom(scratchRoot, 'axe-core').source
+const scans = []
+scans.push(await scanAccessibility(page, {
+  axeSource,
+  label: 'after save',
+  storyId: storyId,
+  exclude: ['#__sdlc_caption'],
+}))
+const a11y = mergeAccessibilityScans(scans)
+writeFileSync(join(outputDir, 'a11y-summary.json'), JSON.stringify(a11y, null, 2))
+assertNoBlockingViolations(a11y)
+```
+
 Result rules:
 
-- **PASS:** every planned critical assertion passed, the video finalized, and the named artifact paths exist from this run.
-- **PARTIAL:** at least one meaningful claim passed, but a later assertion, recording finalization, auth boundary, or non-critical surface failed.
+- **PASS:** every planned critical assertion passed, axe-core ran on all major states with no critical/serious violations, the video finalized, and the named artifact paths exist from this run.
+- **PARTIAL:** at least one meaningful claim passed, but a later assertion, recording finalization, auth boundary, coverage item, or accessibility scan did not complete.
 - **FAIL:** the target surface booted but no core acceptance claim held, or the exercised behavior contradicted the requirement.
 - **NOT_APPLICABLE:** the inspected change has no truthful browser-visible behavior. No video is required.
 - **BLOCKED** is not a feature verdict: use it only when tooling, credentials, dependencies, or startup prevented testing.
@@ -261,7 +292,8 @@ Hand back:
 - **What we proved:** …
 - **Boot method:** Storybook @ http://localhost:6006 (why: …)
 - **Result:** PASS | PARTIAL | FAIL | NOT_APPLICABLE | BLOCKED
-- **Artifacts:** `testreel-output/….mp4`, screenshots…
+- **Artifacts:** `testreel-output/….mp4`, screenshots, `a11y-summary.json`
+- **Accessibility:** states scanned, violation rules, blocking count
 - **Revision:** tested commit/source revision
 - **Residual risks:** …
 ```
@@ -276,18 +308,22 @@ Path: [scripts/caption-overlay.mjs](scripts/caption-overlay.mjs)
 | `updateCaption(page, text)` | Change text only |
 | `hideCaption(page)` | Remove the banner |
 
+Accessibility helper: [scripts/a11y-scan.mjs](scripts/a11y-scan.mjs) — scans one state, merges/deduplicates results, and blocks critical/serious violations.
+
 Copy or import this file into the target project’s scratch runner as needed. Do not reinvent the overlay styles.
 
 ## References
 
 - [references/testreel.md](references/testreel.md) — CLI, definition shape, polish options
 - [references/boot-detection.md](references/boot-detection.md) — Storybook / Playwright / Cypress / Vite / Next heuristics
-- [scripts/smoke-testreel.mjs](scripts/smoke-testreel.mjs) — self-contained narrated smoke against TodoMVC / example.com
+- [scripts/smoke-testreel.mjs](scripts/smoke-testreel.mjs) — self-contained narrated + axe-core smoke against TodoMVC / example.com
+- [scripts/a11y-scan.mjs](scripts/a11y-scan.mjs) — reusable axe-core scan/merge/blocking helpers
 
 ## Quality bar
 
 - Captions on **every** major beat (title + interactions + result)
 - Viewer can understand the video **without audio**
 - Prefer the real feature UI over unrelated pages
+- Axe-core scans on initial + every major asserted state; no PASS when a11y is `notRun`
 - No fake pass: if you could not boot or assert, say so clearly
 - Clean up background servers you started when done (best effort)

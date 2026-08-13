@@ -40,7 +40,7 @@ function resolvePlaywrightId(root) {
 function ensureDeps() {
   const candidates = [FIXTURE_ROOT, process.cwd(), SKILL_ROOT]
   for (const root of candidates) {
-    if (!tryResolveFrom(root, 'testreel')) continue
+    if (!tryResolveFrom(root, 'testreel') || !tryResolveFrom(root, 'axe-core')) continue
     const playwrightId = resolvePlaywrightId(root)
     if (playwrightId) return { root, cleanup: false, playwrightId }
   }
@@ -48,9 +48,11 @@ function ensureDeps() {
     requireHere.resolve('testreel')
     try {
       requireHere.resolve('playwright')
+      requireHere.resolve('axe-core')
       return { root: __dirname, cleanup: false, playwrightId: 'playwright' }
     } catch {
       requireHere.resolve('playwright-core')
+      requireHere.resolve('axe-core')
       return { root: __dirname, cleanup: false, playwrightId: 'playwright-core' }
     }
   } catch {
@@ -62,13 +64,13 @@ function ensureDeps() {
     join(scratch, 'package.json'),
     JSON.stringify({ name: 'sdlc-qa-demo-dummy', private: true, type: 'module' }, null, 2),
   )
-  console.log(`[qa-demo] Installing testreel + playwright into ${scratch}`)
-  const install = spawnSync('npm', ['install', 'testreel', 'playwright', '--no-fund', '--no-audit'], {
+  console.log(`[qa-demo] Installing testreel + playwright + axe-core into ${scratch}`)
+  const install = spawnSync('npm', ['install', 'testreel', 'playwright', 'axe-core', '--no-fund', '--no-audit'], {
     cwd: scratch,
     stdio: 'inherit',
     env: process.env,
   })
-  if (install.status !== 0) throw new Error('npm install testreel playwright failed')
+  if (install.status !== 0) throw new Error('npm install testreel playwright axe-core failed')
   const pw = spawnSync('npx', ['playwright', 'install', 'chromium'], {
     cwd: scratch,
     stdio: 'inherit',
@@ -84,9 +86,9 @@ function loadFrom(root, id) {
 
 async function main() {
   const captionPath = join(SKILL_ROOT, 'scripts/caption-overlay.mjs')
-  if (!existsSync(captionPath)) {
-    throw new Error(`Missing caption helper at ${captionPath}`)
-  }
+  const a11yPath = join(SKILL_ROOT, 'scripts/a11y-scan.mjs')
+  if (!existsSync(captionPath)) throw new Error(`Missing caption helper at ${captionPath}`)
+  if (!existsSync(a11yPath)) throw new Error(`Missing accessibility helper at ${a11yPath}`)
 
   const { root, cleanup, playwrightId } = ensureDeps()
   let browser
@@ -96,6 +98,9 @@ async function main() {
     const { chromium } = loadFrom(root, playwrightId)
     const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
     const { showCaption, hideCaption } = await import(pathToFileURL(captionPath).href)
+    const { scanAccessibility, mergeAccessibilityScans, assertNoBlockingViolations } = await import(pathToFileURL(a11yPath).href)
+    const axeSource = loadFrom(root, 'axe-core').source
+    const a11yScans = []
 
     const format = hasFfmpeg() ? 'mp4' : 'webm'
     console.log(`[qa-demo] Target: ${BASE_URL}`)
@@ -107,6 +112,7 @@ async function main() {
     mkdirSync(OUT_DIR, { recursive: true })
     browser = await chromium.launch()
     const context = await browser.newContext({
+      bypassCSP: true,
       viewport: { width: 1280, height: 720 },
       recordVideo: { dir: OUT_DIR, size: { width: 1280, height: 720 } },
     })
@@ -139,6 +145,12 @@ async function main() {
 
     await page.getByTestId('task-board-app').waitFor({ state: 'visible' })
     await page.getByTestId('status').getByText('0 tasks').waitFor({ state: 'visible' })
+    a11yScans.push(await scanAccessibility(page, {
+      axeSource,
+      label: 'Initial empty board',
+      storyId: 'task-board--initial',
+      exclude: ['#__sdlc_caption'],
+    }))
 
     await showCaption(page, {
       kicker: '01 · addTask',
@@ -157,6 +169,12 @@ async function main() {
     await page.getByTestId('status').getByText('1 tasks · 1 active · 0 completed').waitFor({
       state: 'visible',
     })
+    a11yScans.push(await scanAccessibility(page, {
+      axeSource,
+      label: 'Task added',
+      storyId: 'task-board--task-added',
+      exclude: ['#__sdlc_caption'],
+    }))
     await hideCursor(page)
     await recorder.zoom({ selector: '[data-testid="task-1"]', scale: 1.7, duration: 600 })
     await recorder.screenshot('added-high-priority')
@@ -186,6 +204,12 @@ async function main() {
     await recorder.click('[data-testid="filter-completed"]')
     await taskTitle.waitFor({ state: 'visible' })
     await page.getByTestId('priority-1').waitFor({ state: 'visible' })
+    a11yScans.push(await scanAccessibility(page, {
+      axeSource,
+      label: 'Completed filter',
+      storyId: 'task-board--completed-filter',
+      exclude: ['#__sdlc_caption'],
+    }))
     await recorder.screenshot('completed-filter')
     await hideCursor(page)
     await page.waitForTimeout(2000)
@@ -199,6 +223,12 @@ async function main() {
     await recorder.click('[data-testid="filter-active"]')
     await page.getByTestId('empty-state').waitFor({ state: 'visible' })
     await page.getByText(/No active tasks/).waitFor({ state: 'visible' })
+    a11yScans.push(await scanAccessibility(page, {
+      axeSource,
+      label: 'Active empty state',
+      storyId: 'task-board--active-empty',
+      exclude: ['#__sdlc_caption'],
+    }))
     await hideCursor(page)
     await recorder.zoom({ selector: '[data-testid="empty-state"]', scale: 1.7, duration: 600 })
     await recorder.screenshot('active-empty')
@@ -219,6 +249,15 @@ async function main() {
     await page.getByTestId('status').getByText('1 tasks · 0 active · 1 completed').waitFor({
       state: 'visible',
     })
+    a11yScans.push(await scanAccessibility(page, {
+      axeSource,
+      label: 'Blank-title validation',
+      storyId: 'task-board--validation',
+      exclude: ['#__sdlc_caption'],
+    }))
+    const a11ySummary = mergeAccessibilityScans(a11yScans)
+    writeFileSync(join(OUT_DIR, 'a11y-summary.json'), JSON.stringify(a11ySummary, null, 2))
+    assertNoBlockingViolations(a11ySummary)
     await recorder.screenshot('blank-title-rejected')
     await hideCursor(page)
     await page.waitForTimeout(2200)
@@ -227,7 +266,7 @@ async function main() {
     await showCaption(page, {
       kicker: 'Result',
       claim: 'addTask, markComplete, both filters, and blank-title reject held',
-      detail: 'Counts, HIGH badge, completed row, empty-state copy, and error all asserted',
+      detail: 'UI assertions held and axe-core found no critical/serious violations',
     })
     await hideCursor(page)
     await page.waitForTimeout(2400)
@@ -235,6 +274,7 @@ async function main() {
 
     const result = await recorder.stop()
     console.log('[qa-demo] PASS')
+    console.log(`[qa-demo] A11y: ${a11ySummary.violations.length} violation rule(s), ${a11ySummary.blockingViolations.length} blocking`)
     console.log(`[qa-demo] Video: ${result.video}`)
     if (result.screenshots?.length) {
       console.log(`[qa-demo] Screenshots: ${result.screenshots.join(', ')}`)
