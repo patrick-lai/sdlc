@@ -1,0 +1,12 @@
+{
+  "name": "be-pr-review",
+  "description": "Provider-neutral backend PR review with read-only multi-agent fan-out, adversarial synthesis, and revision-bound verification evidence.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "repository": "https://github.com/patrick-lai/sdlc",
+  "license": "MIT",
+  "keywords": ["pull-request", "backend", "review", "multi-agent", "reliability", "security"]
+}
