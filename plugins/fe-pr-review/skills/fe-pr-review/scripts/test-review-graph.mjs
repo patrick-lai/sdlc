@@ -230,6 +230,21 @@ try {
   assert.ok(!report.html.includes('__FE_REVIEW_REPORT_JSON__'))
   assert.ok(report.html.includes('Every review facet'))
   assert.ok(report.html.includes('Executive summary'))
+  assert.ok(report.html.includes('How to read this report'))
+  assert.ok(report.html.includes('id="top-jump"'))
+  assert.ok(report.html.includes('Read in order'))
+  assert.ok(report.html.includes('revealHashTarget'))
+  assert.ok(!report.html.includes('const URL_RE'), 'URL regex must not be a late const — findings render before it would initialize')
+  const passExec = buildReportDocument({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'clear' },
+    qa: { status: 'not-run' },
+    nodeResults: [],
+    selected: [],
+    coverage: [],
+  })
+  assert.match(passExec.executive.decision, /mergeable/i)
+  assert.match(passExec.executive.nextStep, /approve/i)
   const failExec = buildReportDocument({
     snapshot: { h0: head, base: 'base', diffHash: 'hash' },
     synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'clear' },
@@ -240,6 +255,8 @@ try {
   })
   assert.ok(!failExec.executive.bullets.some((line) => /passed/i.test(line)), 'fresh FAIL QA must not read as passed')
   assert.ok(failExec.executive.bullets.some((line) => /failed/i.test(line)))
+  assert.ok(failExec.executive.decision)
+  assert.ok(failExec.executive.nextStep)
   const duplicateDoc = buildReportDocument({
     snapshot: { h0: head, base: 'base', diffHash: 'hash' },
     synthesis: {

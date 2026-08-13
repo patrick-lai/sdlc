@@ -79,8 +79,25 @@
         min-height: 100%;
         background: var(--bg);
         color: var(--ink);
-        font: 13px/1.5 var(--font);
+        font: 14px/1.5 var(--font);
         -webkit-font-smoothing: antialiased;
+      }
+
+      .skip {
+        position: absolute;
+        left: 12px;
+        top: -40px;
+        z-index: 40;
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        background: var(--accent);
+        color: #fff;
+        font: 650 12px/1 var(--font);
+      }
+
+      .skip:focus {
+        top: 12px;
+        text-decoration: none;
       }
 
       a {
@@ -154,6 +171,28 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+
+      .top-jump {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .top-jump a {
+        padding: 6px 8px;
+        border-radius: 999px;
+        color: var(--muted);
+        font: 650 11px/1 var(--font);
+      }
+
+      .top-jump a:hover,
+      .top-jump a.is-active {
+        background: var(--accent-soft);
+        color: var(--ink);
+        text-decoration: none;
       }
 
       .top-actions {
@@ -325,6 +364,57 @@
         text-transform: uppercase;
       }
 
+      .exec-stat[data-tone="blocked"] b {
+        color: var(--blocked);
+      }
+      .exec-stat[data-tone="passable"] b {
+        color: var(--passable);
+      }
+      .exec-stat[data-tone="unverified"] b {
+        color: var(--unverified);
+      }
+      .exec-stat[data-tone="ok"] b {
+        color: var(--ok);
+      }
+
+      .exec-decision {
+        margin-top: 16px;
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line);
+        background: var(--surface-2);
+      }
+
+      .exec-decision strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .exec-decision span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .verdict[data-tone="blocked"] .exec-decision {
+        border-color: var(--blocked-line);
+        background: var(--blocked-bg);
+      }
+      .verdict[data-tone="passable"] .exec-decision,
+      .exec[data-tone="passable"] .exec-decision {
+        border-color: var(--passable-line);
+        background: var(--passable-bg);
+      }
+      .exec[data-tone="blocked"] .exec-decision {
+        border-color: var(--blocked-line);
+        background: var(--blocked-bg);
+      }
+      .exec[data-tone="unverified"] .exec-decision {
+        border-color: var(--unverified-line);
+        background: var(--unverified-bg);
+      }
+
       .action-list {
         display: grid;
         gap: 8px;
@@ -425,6 +515,101 @@
 
       .finding-fix strong {
         color: var(--ink);
+      }
+
+      .guide {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .guide a {
+        display: grid;
+        gap: 4px;
+        padding: 10px 11px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        color: var(--ink);
+        text-decoration: none;
+      }
+
+      .guide a:hover,
+      .guide a.is-current {
+        border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+        background: var(--accent-soft);
+        text-decoration: none;
+      }
+
+      .guide b {
+        font: 650 10px/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+
+      .guide strong {
+        font-size: 13px;
+        letter-spacing: -0.02em;
+      }
+
+      .guide span {
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .section-next {
+        display: inline-flex;
+        margin-top: 12px;
+        font: 650 12px/1 var(--font);
+      }
+
+      .nav-group {
+        margin: 10px 0 4px;
+        color: var(--faint);
+        font: 650 10px/1 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .nav-sub {
+        display: grid;
+        gap: 2px;
+        margin: 0 0 6px 8px;
+      }
+
+      .nav-sub a {
+        font-size: 12px;
+        padding: 5px 8px;
+      }
+
+      .search-hint {
+        margin: 6px 0 0;
+        color: var(--faint);
+        font-size: 11px;
+      }
+
+      .search-hint kbd {
+        font: 650 10px/1 var(--mono);
+        padding: 1px 4px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--surface-2);
+      }
+
+      .is-target {
+        outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+        outline-offset: 3px;
+        animation: target-pulse 1.4s ease;
+      }
+
+      @keyframes target-pulse {
+        from {
+          outline-color: var(--accent);
+        }
+        to {
+          outline-color: transparent;
+        }
       }
 
       .layout {
@@ -840,16 +1025,27 @@
 
       @media (max-width: 960px) {
         .layout {
-          grid-template-columns: 1fr;
+          display: flex;
+          flex-direction: column;
         }
 
         .sidebar {
           position: static;
+          order: 2;
+        }
+
+        .main {
+          order: 1;
         }
 
         .metrics,
-        .exec-stats {
+        .exec-stats,
+        .guide {
           grid-template-columns: 1fr 1fr;
+        }
+
+        .top-jump {
+          display: none;
         }
       }
 
@@ -873,6 +1069,7 @@
     </style>
   </head>
   <body>
+    <a class="skip" href="#section-summary">Skip to summary</a>
     <header class="top">
       <div class="brand">
         <span class="mark" aria-hidden="true"></span>
@@ -881,8 +1078,9 @@
           <span id="brand-meta">Evidence report</span>
         </div>
       </div>
+      <nav class="top-jump" id="top-jump" aria-label="Jump to section"></nav>
       <div class="top-actions">
-        <button class="btn" id="theme-toggle" type="button">Theme</button>
+        <button class="btn" id="theme-toggle" type="button">Light theme</button>
         <span class="badge">Read-only</span>
       </div>
     </header>
@@ -900,27 +1098,29 @@
     <div class="layout">
       <aside class="sidebar">
         <div class="panel">
-          <h2>Find in report</h2>
+          <h2>Find</h2>
           <input
             class="search"
             id="search"
             type="search"
-            placeholder="Search findings, facets, files…"
+            placeholder="Findings, files, facets…"
             autocomplete="off"
           />
+          <p class="search-hint">Press <kbd>/</kbd> to search. Use Jump for experts.</p>
         </div>
         <div class="panel">
           <h2>Jump</h2>
           <nav class="nav" id="nav"></nav>
         </div>
-        <div class="panel">
-          <h2>Filter findings</h2>
-          <div class="filters" id="finding-filters"></div>
-        </div>
-        <div class="panel">
-          <h2>Filter facets</h2>
-          <div class="filters" id="facet-filters"></div>
-        </div>
+        <details class="panel fold">
+          <summary>Filters</summary>
+          <div class="fold-body">
+            <h2>Findings</h2>
+            <div class="filters" id="finding-filters"></div>
+            <h2>Facets</h2>
+            <div class="filters" id="facet-filters"></div>
+          </div>
+        </details>
       </aside>
 
       <main class="main" id="app"></main>
@@ -958,11 +1158,13 @@
         if (storedTheme === 'light' || storedTheme === 'dark') {
           document.documentElement.dataset.theme = storedTheme
         }
+        syncThemeLabel()
 
         themeToggle.addEventListener('click', () => {
           const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'
           document.documentElement.dataset.theme = next
           localStorage.setItem('fe-pr-review-theme', next)
+          syncThemeLabel()
         })
 
         document.getElementById('brand-meta').textContent =
@@ -970,27 +1172,30 @@
 
         const verdictEl = document.getElementById('verdict')
         verdictEl.dataset.tone = data.verdict?.tone || data.verdict?.value || 'unverified'
-        document.getElementById('verdict-title').textContent = data.executive?.headline || data.verdict?.label || titleCase(data.verdict?.value)
-        document.getElementById('verdict-rationale').textContent = data.executive?.rationale || data.verdict?.rationale || ''
+        document.getElementById('verdict-title').textContent = data.verdict?.label || titleCase(data.verdict?.value)
+        document.getElementById('verdict-rationale').textContent = data.executive?.headline || data.verdict?.rationale || ''
 
-        const sections = [
-          { id: 'summary', title: 'Summary' },
-          { id: 'snapshot', title: 'Snapshot' },
-          { id: 'findings', title: 'Findings' },
-          { id: 'feature-gate', title: 'Feature gate' },
-          { id: 'coverage', title: 'Every review facet' },
-          { id: 'follow-ups', title: 'Follow-ups' },
-          { id: 'qa', title: 'QA evidence' },
-          { id: 'limitations', title: 'Limitations' },
+        const readPath = [
+          { id: 'summary', step: '1', title: 'What happened', hint: 'Verdict and what to do next' },
+          { id: 'findings', step: '2', title: 'Findings', hint: 'Issues to act on', count: data.counts?.blocking || data.findings?.length || 0 },
+          { id: 'feature-gate', step: '3', title: 'Rollout', hint: 'Feature-gate path' },
+          { id: 'qa', step: '4', title: 'QA proof', hint: 'Visual evidence only if fresh' },
         ]
+        const morePath = [
+          { id: 'snapshot', title: 'Snapshot' },
+          { id: 'coverage', title: 'Every review facet', count: data.counts?.facets },
+          { id: 'follow-ups', title: 'Follow-ups', count: data.operationalFollowUps?.length },
+          { id: 'limitations', title: 'Limitations', count: data.limitations?.length },
+        ]
+        const blockingFinds = (data.findings || []).filter((f) => f.group === 'blocking').slice(0, 5)
 
-        for (const section of sections) {
-          nav.appendChild(el('a', { href: '#section-' + section.id, 'data-nav': section.id }, [section.title]))
-        }
+        renderJumpNav()
+        renderTopJump()
 
         document.getElementById('verdict-chip').textContent =
           (data.verdict?.value || 'unverified') + ' · advice only'
 
+        app.appendChild(renderGuide())
         app.appendChild(renderExecutive(data))
         app.appendChild(renderSnapshot(data))
         app.appendChild(renderFindings(data))
@@ -1012,16 +1217,70 @@
         wireFacetFilters(data)
         wireSearch()
         wireNav()
+        wireKeyboard()
+        revealHashTarget()
+        window.addEventListener('hashchange', revealHashTarget)
 
-        wireNav()
+        function renderGuide() {
+          const navEl = el('nav', { class: 'guide', id: 'guide', 'aria-label': 'How to read this report' })
+          for (const step of readPath) {
+            navEl.appendChild(
+              el('a', { href: '#section-' + step.id, 'data-guide': step.id }, [
+                el('b', {}, ['Step ' + step.step]),
+                el('strong', {}, [step.title]),
+                el('span', {}, [step.hint]),
+              ]),
+            )
+          }
+          return navEl
+        }
+
+        function renderJumpNav() {
+          nav.appendChild(el('div', { class: 'nav-group' }, ['Read in order']))
+          for (const section of readPath) {
+            const label = section.count != null ? section.title + ' · ' + section.count : section.title
+            nav.appendChild(
+              el('a', { href: '#section-' + section.id, 'data-nav': section.id }, [section.step + ' · ' + label]),
+            )
+          }
+          if (blockingFinds.length) {
+            const sub = el('div', { class: 'nav-sub' })
+            for (const finding of blockingFinds) {
+              sub.appendChild(el('a', { href: '#finding-' + finding.id }, [finding.title]))
+            }
+            nav.appendChild(sub)
+          }
+          nav.appendChild(el('div', { class: 'nav-group' }, ['Jump']))
+          for (const section of morePath) {
+            const label = section.count ? section.title + ' · ' + section.count : section.title
+            nav.appendChild(el('a', { href: '#section-' + section.id, 'data-nav': section.id }, [label]))
+          }
+        }
+
+        function renderTopJump() {
+          const host = document.getElementById('top-jump')
+          const jumps = [
+            { id: 'summary', title: 'Summary' },
+            { id: 'findings', title: 'Findings' },
+            { id: 'feature-gate', title: 'Gate' },
+            { id: 'coverage', title: 'Facets' },
+            { id: 'qa', title: 'QA' },
+          ]
+          for (const item of jumps) {
+            host.appendChild(el('a', { href: '#section-' + item.id, 'data-nav': item.id }, [item.title]))
+          }
+        }
 
         function renderExecutive(data) {
-          const section = sectionShell('summary', 'Executive summary', 'Plain-language readout. Drill into sections below for evidence.')
-          const exec = el('div', { class: 'exec' }, [
+          const section = sectionShell('summary', '1 · Executive summary', 'Start here. This is the merge advice in plain language.')
+          const tone = data.verdict?.tone || data.verdict?.value || 'unverified'
+          const exec = el('div', { class: 'exec', 'data-tone': tone }, [
             el('p', { class: 'exec-kicker' }, ['Start here']),
-            el('h3', { class: 'exec-headline' }, [data.executive?.headline || 'Review summary']),
+            el('h3', { class: 'exec-headline' }, [data.executive?.decision || data.executive?.headline || 'Review summary']),
           ])
-          if (data.executive?.rationale) {
+          if (data.executive?.nextStep) {
+            exec.appendChild(el('p', { class: 'exec-rationale' }, [data.executive.nextStep]))
+          } else if (data.executive?.rationale) {
             exec.appendChild(el('p', { class: 'exec-rationale' }, [data.executive.rationale]))
           }
           const bullets = el('ul', { class: 'exec-bullets' })
@@ -1029,11 +1288,17 @@
           exec.appendChild(bullets)
 
           const stats = el('div', { class: 'exec-stats', role: 'group', 'aria-label': 'Review counts' })
-          stats.appendChild(execStat('blocking', data.counts?.blocking, 'Blocking'))
-          stats.appendChild(execStat('passable', data.counts?.nonBlocking, 'Non-blocking'))
+          stats.appendChild(execStat('blocked', data.counts?.blocking, 'Blocking'))
+          stats.appendChild(execStat('ok', data.counts?.nonBlocking, 'Non-blocking'))
           stats.appendChild(execStat('unverified', data.counts?.unverifiedFindings, 'Unverified claims'))
           stats.appendChild(execStat('unverified', data.counts?.facetsUnverified, 'Unverified facets'))
           exec.appendChild(stats)
+
+          if (data.executive?.rationale && data.executive?.nextStep) {
+            exec.appendChild(
+              el('p', { class: 'exec-rationale', style: 'color:var(--faint);font-size:13px' }, [data.executive.rationale]),
+            )
+          }
 
           if (data.executive?.actions?.length) {
             exec.appendChild(el('p', { class: 'exec-kicker', style: 'margin-top:18px' }, ['What to fix first']))
@@ -1057,7 +1322,8 @@
           }
 
           section.appendChild(exec)
-          section.appendChild(el('p', { class: 'reading-hint' }, ['Need proof? Expand findings, feature-gate path, or the full facet table below.']))
+          section.appendChild(el('p', { class: 'reading-hint' }, ['Need proof? Open a finding, then check rollout and QA.']))
+          section.appendChild(nextLink('findings', 'Next: Findings'))
           return section
         }
 
@@ -1069,7 +1335,7 @@
         }
 
         function renderSnapshot(data) {
-          const section = sectionShell('snapshot', 'Snapshot', 'Head, base, and diff anchors for staleness checks.')
+          const section = sectionShell('snapshot', 'Snapshot', 'Revision anchors if you need to check staleness. Most reviewers can skip this.')
           const fold = el('details', { class: 'fold' })
           fold.appendChild(el('summary', {}, ['Show revision anchors (H0, base, diff)']))
           const body = el('div', { class: 'fold-body' })
@@ -1099,16 +1365,17 @@
         function renderFindings(data) {
           const section = sectionShell(
             'findings',
-            'Findings',
-            'Blocking items first. Expand for execution path, disconfirming evidence, and verification.',
+            '2 · Findings',
+            'Blocking items first. Expand one card for the path, evidence, and how to verify the fix.',
           )
           const list = el('div', { class: 'card-list', id: 'finding-list' })
           if (!data.findings?.length) {
-            list.appendChild(el('p', { class: 'empty' }, ['No synthesized findings.']))
+            list.appendChild(el('p', { class: 'empty' }, ['No synthesized findings. Continue to rollout and QA.']))
           } else {
             for (const finding of data.findings) list.appendChild(renderFinding(finding))
           }
           section.appendChild(list)
+          section.appendChild(nextLink('feature-gate', 'Next: Rollout'))
           return section
         }
 
@@ -1163,8 +1430,8 @@
         function renderFeatureGate(data) {
           const section = sectionShell(
             'feature-gate',
-            'Feature-gate decision',
-            'Rollout requirement and the full fg-* path.',
+            '3 · Rollout',
+            'Is a feature gate required, and was the full on/off path checked?',
           )
           const banner = el('div', { class: 'gate-banner' }, [
             el('strong', {}, ['Required: ' + titleCase(data.featureGate?.status)]),
@@ -1191,6 +1458,7 @@
           ]))
 
           section.appendChild(renderFacetTable(data.gatePath, 'gate-table'))
+          section.appendChild(nextLink('qa', 'Next: QA proof'))
           return section
         }
 
@@ -1198,7 +1466,7 @@
           const section = sectionShell(
             'coverage',
             'Every review facet',
-            'Filter by reviewer lens or status. Search matches facet IDs and summaries.',
+            'The full checklist. Use Filters or search when you already know the lens.',
           )
           section.appendChild(renderFacetTable(data.coverage || [], 'coverage-table'))
           return section
@@ -1267,7 +1535,11 @@
         }
 
         function renderQa(data) {
-          const section = sectionShell('qa', 'QA evidence', 'Fresh qa-demo output only counts as proof.')
+          const section = sectionShell(
+            'qa',
+            '4 · QA proof',
+            'Only a fresh qa-demo report on this same head counts as visual proof.',
+          )
           const banner = el('div', { class: 'gate-banner' }, [
             el('strong', {}, ['Status: ' + String(data.qa?.status || 'not-run').toUpperCase()]),
             el('p', { style: 'margin:0;color:var(--muted)' }, [data.qa?.reason || '']),
@@ -1278,6 +1550,7 @@
           meta.appendChild(metaChip('Artifact hash', data.qa?.hash || 'none', null, false))
           section.appendChild(banner)
           section.appendChild(meta)
+          section.appendChild(nextLink('coverage', 'Optional: every facet'))
           return section
         }
 
@@ -1323,6 +1596,23 @@
 
         function wireFacetFilters(data) {
           const host = document.getElementById('facet-filters')
+          const statuses = ['all-status', 'finding', 'unverified', 'checked']
+          for (const status of statuses) {
+            const key = status === 'all-status' ? 'all' : status
+            const count =
+              key === 'all'
+                ? data.coverage?.length || 0
+                : (data.coverage || []).filter((r) => r.status === key).length
+            host.appendChild(
+              filterPill(
+                'status-' + key,
+                key === 'all' ? 'All statuses' : titleCase(key),
+                count,
+                key === 'all',
+                applyFacetStatusFilter,
+              ),
+            )
+          }
           const personas = ['all', ...new Set((data.coverage || []).map((r) => r.persona))]
           for (const persona of personas) {
             const count =
@@ -1330,7 +1620,13 @@
                 ? data.coverage?.length || 0
                 : (data.coverage || []).filter((r) => r.persona === persona).length
             host.appendChild(
-              filterPill('persona-' + persona, persona === 'all' ? 'All' : persona, count, persona === 'all', applyFacetFilter),
+              filterPill(
+                'persona-' + persona,
+                persona === 'all' ? 'All reviewers' : titleCase(persona),
+                count,
+                persona === 'all',
+                applyFacetFilter,
+              ),
             )
           }
         }
@@ -1349,6 +1645,7 @@
 
         let activeFindingFilter = 'all'
         let activeFacetFilter = 'all'
+        let activeFacetStatus = 'all'
 
         function applyFindingFilter(id, btn) {
           activeFindingFilter = id
@@ -1360,10 +1657,21 @@
 
         function applyFacetFilter(id, btn) {
           activeFacetFilter = id.replace(/^persona-/, '')
-          for (const pill of document.querySelectorAll('#facet-filters .pill')) {
+          for (const pill of document.querySelectorAll('#facet-filters .pill[data-filter^="persona-"]')) {
             pill.setAttribute(
               'aria-pressed',
               String(pill.dataset.filter.replace(/^persona-/, '') === activeFacetFilter),
+            )
+          }
+          applySearch()
+        }
+
+        function applyFacetStatusFilter(id) {
+          activeFacetStatus = id.replace(/^status-/, '')
+          for (const pill of document.querySelectorAll('#facet-filters .pill[data-filter^="status-"]')) {
+            pill.setAttribute(
+              'aria-pressed',
+              String(pill.dataset.filter.replace(/^status-/, '') === activeFacetStatus),
             )
           }
           applySearch()
@@ -1394,43 +1702,84 @@
           }
           for (const row of document.querySelectorAll('.facet-row')) {
             const persona = row.getAttribute('data-persona')
+            const status = row.getAttribute('data-status')
             const text = (row.getAttribute('data-search') || row.textContent || '').toLowerCase()
             const personaOk = activeFacetFilter === 'all' || activeFacetFilter === persona
+            const statusOk = activeFacetStatus === 'all' || activeFacetStatus === status
             const searchOk = !q || text.includes(q)
-            row.setAttribute('data-hidden', String(!(personaOk && searchOk)))
+            row.setAttribute('data-hidden', String(!(personaOk && statusOk && searchOk)))
           }
         }
 
         function wireNav() {
-          const links = [...document.querySelectorAll('[data-nav]')]
+          const links = [...document.querySelectorAll('[data-nav], [data-guide]')]
           const observer = new IntersectionObserver(
             (entries) => {
               for (const entry of entries) {
                 if (!entry.isIntersecting) continue
-                for (const link of links) link.classList.remove('is-active')
-                const active = document.querySelector('[data-nav="' + entry.target.id.replace(/^section-/, '') + '"]')
-                if (active) active.classList.add('is-active')
+                const id = entry.target.id.replace(/^section-/, '')
+                for (const link of links) {
+                  const key = link.getAttribute('data-nav') || link.getAttribute('data-guide')
+                  link.classList.toggle('is-active', key === id)
+                  if (link.hasAttribute('data-guide')) link.classList.toggle('is-current', key === id)
+                }
               }
             },
             { rootMargin: '-40% 0px -50% 0px', threshold: 0.01 },
           )
+          const seen = new Set()
           for (const link of links) {
-            const id = link.getAttribute('data-nav')
+            const id = link.getAttribute('data-nav') || link.getAttribute('data-guide')
+            if (!id || seen.has(id)) continue
+            seen.add(id)
             const section = document.getElementById('section-' + id)
             if (section) observer.observe(section)
           }
         }
 
+        function wireKeyboard() {
+          document.addEventListener('keydown', (event) => {
+            const typing = event.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)
+            if (event.key === '/' && !typing && !event.metaKey && !event.ctrlKey) {
+              event.preventDefault()
+              search.focus()
+              search.select()
+              return
+            }
+            if (event.key === 'Escape' && document.activeElement === search) {
+              search.blur()
+              return
+            }
+            if (typing || event.metaKey || event.ctrlKey || event.altKey) return
+            const step = readPath.find((item) => item.step === event.key)
+            if (step) location.hash = 'section-' + step.id
+          })
+        }
+
+        function revealHashTarget() {
+          const id = decodeURIComponent(location.hash.replace(/^#/, ''))
+          if (!id) return
+          const target = document.getElementById(id)
+          if (!target) return
+          const details = target.querySelector('details')
+          if (details) details.open = true
+          document.querySelectorAll('.is-target').forEach((node) => node.classList.remove('is-target'))
+          target.classList.add('is-target')
+          target.scrollIntoView({ block: 'start', behavior: 'smooth' })
+        }
+
+        function syncThemeLabel() {
+          const light = document.documentElement.dataset.theme === 'light'
+          themeToggle.textContent = light ? 'Dark theme' : 'Light theme'
+        }
+
+        function nextLink(id, label) {
+          return el('a', { class: 'section-next', href: '#section-' + id }, [label + ' →'])
+        }
+
         function sectionShell(id, title, helper) {
           return el('section', { class: 'section', id: 'section-' + id }, [
             el('div', { class: 'section-head' }, [el('h2', {}, [title]), el('p', {}, [helper])]),
-          ])
-        }
-
-        function metric(tone, label, value) {
-          return el('div', { class: 'metric', 'data-tone': tone }, [
-            el('b', {}, [String(value ?? 0)]),
-            el('span', {}, [label]),
           ])
         }
 
@@ -1461,12 +1810,11 @@
           return el('div', {}, [el('dt', {}, [label]), dd])
         }
 
-        const URL_RE = /\bhttps?:\/\/[^\s<>"']+/g
-
         function appendLinkedText(parent, text) {
           const raw = String(text ?? '')
+          const urlRe = /\bhttps?:\/\/[^\s<>"']+/g
           let last = 0
-          for (const match of raw.matchAll(URL_RE)) {
+          for (const match of raw.matchAll(urlRe)) {
             const url = match[0]
             const start = match.index ?? 0
             if (start > last) parent.appendChild(document.createTextNode(raw.slice(last, start)))

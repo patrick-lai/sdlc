@@ -57,6 +57,20 @@ function buildExecutiveSummary({ verdict, counts, qa, featureGate, findings, fai
         ? 'No blocking issues — scan notes below before approving.'
         : 'Incomplete review — do not treat this as a clean pass.'
 
+  const decision =
+    verdict.value === 'blocked'
+      ? 'Do not merge yet.'
+      : verdict.value === 'passable'
+        ? 'Looks mergeable after a quick scan.'
+        : 'Incomplete review — do not treat this as a pass.'
+
+  const nextStep =
+    verdict.value === 'blocked'
+      ? 'Open each blocking finding, then confirm the suggested fix.'
+      : verdict.value === 'passable'
+        ? 'Scan notes and QA, then you can approve.'
+        : 'Read limitations and failed coverage before deciding.'
+
   const bullets = []
   bullets.push(
     counts.blocking
@@ -100,7 +114,7 @@ function buildExecutiveSummary({ verdict, counts, qa, featureGate, findings, fai
     anchor: `finding-${finding.id}`,
   }))
 
-  return { headline, bullets, actions, rationale: verdict.rationale }
+  return { headline, bullets, actions, rationale: verdict.rationale, decision, nextStep }
 }
 
 function linkifyEvidence(text) {
