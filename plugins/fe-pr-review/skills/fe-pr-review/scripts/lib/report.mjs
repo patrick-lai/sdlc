@@ -33,7 +33,68 @@ function slug(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 48) || 'item'
+    .slice(0, 40) || 'item'
+}
+
+function findingId(group, finding, index, used) {
+  const title = finding.title || 'untitled'
+  const base = slug(`${group}-${title}-${finding.file || 'no-file'}-${finding.line ?? 'na'}-${index}`)
+  let id = base
+  let suffix = 2
+  while (used.has(id)) {
+    id = `${base}-${suffix++}`
+  }
+  used.add(id)
+  return id
+}
+
+function buildExecutiveSummary({ verdict, counts, qa, featureGate, findings, failedNodes }) {
+  const blocking = findings.filter((f) => f.group === 'blocking')
+  const headline =
+    verdict.value === 'blocked'
+      ? 'Not ready to merge — fix blocking issues first.'
+      : verdict.value === 'passable'
+        ? 'No blocking issues — scan notes below before approving.'
+        : 'Incomplete review — do not treat this as a clean pass.'
+
+  const bullets = []
+  bullets.push(
+    counts.blocking
+      ? `${counts.blocking} blocking issue${counts.blocking === 1 ? '' : 's'} need attention before merge.`
+      : 'No blocking issues were synthesized from inspected evidence.',
+  )
+  if (counts.nonBlocking) {
+    bullets.push(`${counts.nonBlocking} non-blocking note${counts.nonBlocking === 1 ? '' : 's'} — polish or follow-up.`)
+  }
+  if (featureGate.status === 'required') {
+    bullets.push(
+      featureGate.keys?.length
+        ? `Feature gate required (${featureGate.keys.join(', ')}). Confirm off/on paths before ship.`
+        : 'Feature gate required — confirm keys and rollout path before ship.',
+    )
+  } else if (featureGate.status === 'unverified') {
+    bullets.push('Feature-gate requirement is unverified — rollout safety is not established.')
+  }
+  if (qa.status === 'fresh') bullets.push('Visual QA passed on this head (H0).')
+  else if (qa.status === 'not-run') bullets.push('Visual QA was not run for this head.')
+  else bullets.push(`Visual QA is ${qa.status} — visual proof cannot be relied on.`)
+
+  if (failedNodes?.length) {
+    bullets.push(`${failedNodes.length} reviewer node(s) failed — coverage gaps remain.`)
+  }
+  if (counts.facetsUnverified) {
+    bullets.push(`${counts.facetsUnverified} facet(s) stayed unverified — see limitations.`)
+  }
+
+  const actions = blocking.slice(0, 5).map((finding) => ({
+    title: finding.title,
+    location: finding.location,
+    summary: finding.summary,
+    fix: finding.suggestedFix || null,
+    anchor: `finding-${finding.id}`,
+  }))
+
+  return { headline, bullets, actions, rationale: verdict.rationale }
 }
 
 function linkifyEvidence(text) {
@@ -44,10 +105,11 @@ function linkifyEvidence(text) {
   })
 }
 
-function normalizeFinding(finding, group, index) {
+function normalizeFinding(finding, group, index, used) {
   if (!finding || typeof finding !== 'object') {
+    const id = findingId(group, { title: String(finding) }, index, used)
     return {
-      id: `${group}-${index}`,
+      id,
       group,
       title: String(finding),
       summary: String(finding),
@@ -55,7 +117,7 @@ function normalizeFinding(finding, group, index) {
   }
   const title = finding.title || 'Untitled finding'
   return {
-    id: slug(`${group}-${title}-${finding.file || index}`),
+    id: findingId(group, finding, index, used),
     group,
     title,
     lens: finding.lens || null,
@@ -107,10 +169,11 @@ export function buildReportDocument({
 
   const rows = coverage || []
   const gatePath = rows.filter((row) => row.persona === 'rollout-gates')
+  const usedIds = new Set()
   const findings = [
-    ...(synthesis?.blocking || []).map((f, i) => normalizeFinding(f, 'blocking', i)),
-    ...(synthesis?.nonBlocking || []).map((f, i) => normalizeFinding(f, 'non-blocking', i)),
-    ...(synthesis?.unverified || []).map((f, i) => normalizeFinding(f, 'unverified', i)),
+    ...(synthesis?.blocking || []).map((f, i) => normalizeFinding(f, 'blocking', i, usedIds)),
+    ...(synthesis?.nonBlocking || []).map((f, i) => normalizeFinding(f, 'non-blocking', i, usedIds)),
+    ...(synthesis?.unverified || []).map((f, i) => normalizeFinding(f, 'unverified', i, usedIds)),
   ]
 
   const facetCounts = rows.reduce(
@@ -125,6 +188,44 @@ export function buildReportDocument({
   )
 
   const failedNodes = nodeResults.filter((node) => node.status !== 'ok')
+  const verdict = {
+    value: synthesis?.verdict || 'unverified',
+    ...(VERDICT_META[synthesis?.verdict || 'unverified'] || VERDICT_META.unverified),
+    rationale: synthesis?.rationale || 'Synthesis did not complete.',
+  }
+  const qaDoc = {
+    status: qa?.status || 'not-run',
+    revision: qa?.revision || null,
+    hash: qa?.hash || null,
+    reason:
+      qa?.reason ||
+      qa?.error ||
+      (qa?.status === 'not-run' ? 'QA was not run.' : 'None reported.'),
+  }
+  const featureGateDoc = {
+    status: gate.status,
+    keys: gate.keys || [],
+    rationale: gate.rationale,
+    evidence: gate.evidence || [],
+  }
+  const counts = {
+    blocking: synthesis?.blocking?.length ?? 0,
+    nonBlocking: synthesis?.nonBlocking?.length ?? 0,
+    unverifiedFindings: synthesis?.unverified?.length ?? 0,
+    facets: facetCounts.total,
+    facetsChecked: facetCounts.checked,
+    facetsUnverified: facetCounts.unverified,
+    personas: selected.length,
+    failedNodes: failedNodes.length,
+  }
+  const executive = buildExecutiveSummary({
+    verdict,
+    counts,
+    qa: qaDoc,
+    featureGate: featureGateDoc,
+    findings,
+    failedNodes,
+  })
 
   return {
     schema: 'sdlc.fe-pr-review.report/v1',
@@ -139,36 +240,11 @@ export function buildReportDocument({
       shortBase: shortRef(snapshot.base, 10),
       shortDiff: shortRef(snapshot.diffHash, 12),
     },
-    verdict: {
-      value: synthesis?.verdict || 'unverified',
-      ...(VERDICT_META[synthesis?.verdict || 'unverified'] || VERDICT_META.unverified),
-      rationale: synthesis?.rationale || 'Synthesis did not complete.',
-    },
-    qa: {
-      status: qa?.status || 'not-run',
-      revision: qa?.revision || null,
-      hash: qa?.hash || null,
-      reason:
-        qa?.reason ||
-        qa?.error ||
-        (qa?.status === 'not-run' ? 'QA was not run.' : 'None reported.'),
-    },
-    featureGate: {
-      status: gate.status,
-      keys: gate.keys || [],
-      rationale: gate.rationale,
-      evidence: gate.evidence || [],
-    },
-    counts: {
-      blocking: synthesis?.blocking?.length ?? 0,
-      nonBlocking: synthesis?.nonBlocking?.length ?? 0,
-      unverifiedFindings: synthesis?.unverified?.length ?? 0,
-      facets: facetCounts.total,
-      facetsChecked: facetCounts.checked,
-      facetsUnverified: facetCounts.unverified,
-      personas: selected.length,
-      failedNodes: failedNodes.length,
-    },
+    verdict,
+    executive,
+    qa: qaDoc,
+    featureGate: featureGateDoc,
+    counts,
     selected,
     findings,
     gatePath,
@@ -327,4 +403,4 @@ export function writeHtmlReport(file, document) {
   return file
 }
 
-export { linkifyEvidence, slug, shortRef }
+export { buildExecutiveSummary, linkifyEvidence, slug, shortRef }

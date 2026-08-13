@@ -257,6 +257,176 @@
         color: var(--unverified);
       }
 
+      .exec {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 20px 22px;
+        box-shadow: var(--shadow);
+      }
+
+      .exec-kicker {
+        margin: 0 0 8px;
+        color: var(--faint);
+        font: 650 10px/1 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .exec-headline {
+        margin: 0;
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -0.03em;
+        font-weight: 650;
+      }
+
+      .exec-rationale {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        max-width: 68ch;
+      }
+
+      .exec-bullets {
+        margin: 16px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        display: grid;
+        gap: 6px;
+        font-size: 13.5px;
+      }
+
+      .exec-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .exec-stat {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+      }
+
+      .exec-stat b {
+        display: block;
+        font: 700 20px/1 var(--mono);
+      }
+
+      .exec-stat span {
+        display: block;
+        margin-top: 4px;
+        color: var(--faint);
+        font: 650 9px/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .action-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .action-item {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 12px;
+        align-items: start;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+      }
+
+      .action-num {
+        font: 700 12px/1 var(--mono);
+        color: var(--faint);
+        padding-top: 2px;
+      }
+
+      .action-copy strong {
+        display: block;
+        font-size: 14px;
+        letter-spacing: -0.02em;
+      }
+
+      .action-copy p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .action-copy .loc {
+        margin-top: 6px;
+        color: var(--faint);
+        font: 11px/1.3 var(--mono);
+      }
+
+      .action-jump {
+        font: 650 11px/1 var(--font);
+        white-space: nowrap;
+        align-self: center;
+      }
+
+      .fold {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        overflow: hidden;
+      }
+
+      .fold summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 12px 14px;
+        color: var(--muted);
+        font: 650 12px/1 var(--font);
+        border-bottom: 1px solid transparent;
+      }
+
+      .fold summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .fold[open] summary {
+        border-bottom-color: var(--line);
+        color: var(--ink);
+      }
+
+      .fold-body {
+        padding: 14px;
+      }
+
+      .reading-hint {
+        margin: 0 0 14px;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .finding-lede {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 13.5px;
+        line-height: 1.45;
+      }
+
+      .finding-fix {
+        margin: 10px 0 0;
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        background: var(--bg-subtle);
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      .finding-fix strong {
+        color: var(--ink);
+      }
+
       .layout {
         width: min(1180px, calc(100% - 32px));
         margin: 0 auto;
@@ -677,7 +847,8 @@
           position: static;
         }
 
-        .metrics {
+        .metrics,
+        .exec-stats {
           grid-template-columns: 1fr 1fr;
         }
       }
@@ -799,12 +970,11 @@
 
         const verdictEl = document.getElementById('verdict')
         verdictEl.dataset.tone = data.verdict?.tone || data.verdict?.value || 'unverified'
-        document.getElementById('verdict-title').textContent = data.verdict?.label || titleCase(data.verdict?.value)
-        document.getElementById('verdict-rationale').textContent = data.verdict?.rationale || ''
-        document.getElementById('verdict-chip').textContent =
-          (data.verdict?.value || 'unverified') + ' · advice only'
+        document.getElementById('verdict-title').textContent = data.executive?.headline || data.verdict?.label || titleCase(data.verdict?.value)
+        document.getElementById('verdict-rationale').textContent = data.executive?.rationale || data.verdict?.rationale || ''
 
         const sections = [
+          { id: 'summary', title: 'Summary' },
           { id: 'snapshot', title: 'Snapshot' },
           { id: 'findings', title: 'Findings' },
           { id: 'feature-gate', title: 'Feature gate' },
@@ -817,8 +987,11 @@
           nav.appendChild(el('a', { href: '#section-' + section.id, 'data-nav': section.id }, [section.title]))
         }
 
+        document.getElementById('verdict-chip').textContent =
+          (data.verdict?.value || 'unverified') + ' · advice only'
+
+        app.appendChild(renderExecutive(data))
         app.appendChild(renderSnapshot(data))
-        app.appendChild(renderMetrics(data))
         app.appendChild(renderFindings(data))
         app.appendChild(renderFeatureGate(data))
         app.appendChild(renderCoverage(data))
@@ -838,8 +1011,66 @@
         wireSearch()
         wireNav()
 
+        wireNav()
+
+        function renderExecutive(data) {
+          const section = sectionShell('summary', 'Executive summary', 'Plain-language readout. Drill into sections below for evidence.')
+          const exec = el('div', { class: 'exec' }, [
+            el('p', { class: 'exec-kicker' }, ['Start here']),
+            el('h3', { class: 'exec-headline' }, [data.executive?.headline || 'Review summary']),
+          ])
+          if (data.executive?.rationale) {
+            exec.appendChild(el('p', { class: 'exec-rationale' }, [data.executive.rationale]))
+          }
+          const bullets = el('ul', { class: 'exec-bullets' })
+          for (const line of data.executive?.bullets || []) bullets.appendChild(el('li', {}, [line]))
+          exec.appendChild(bullets)
+
+          const stats = el('div', { class: 'exec-stats', role: 'group', 'aria-label': 'Review counts' })
+          stats.appendChild(execStat('blocking', data.counts?.blocking, 'Blocking'))
+          stats.appendChild(execStat('passable', data.counts?.nonBlocking, 'Non-blocking'))
+          stats.appendChild(execStat('unverified', data.counts?.unverifiedFindings, 'Unverified claims'))
+          stats.appendChild(execStat('unverified', data.counts?.facetsUnverified, 'Unverified facets'))
+          exec.appendChild(stats)
+
+          if (data.executive?.actions?.length) {
+            exec.appendChild(el('p', { class: 'exec-kicker', style: 'margin-top:18px' }, ['What to fix first']))
+            const actions = el('div', { class: 'action-list' })
+            data.executive.actions.forEach((action, index) => {
+              const copy = el('div', { class: 'action-copy' }, [
+                el('strong', {}, [action.title]),
+                el('p', {}, [action.summary]),
+              ])
+              if (action.location) copy.appendChild(el('div', { class: 'loc' }, [action.location]))
+              if (action.fix) copy.appendChild(el('p', { style: 'margin:6px 0 0;font-size:12px' }, ['Fix: ' + action.fix]))
+              actions.appendChild(
+                el('div', { class: 'action-item' }, [
+                  el('span', { class: 'action-num' }, [String(index + 1)]),
+                  copy,
+                  el('a', { class: 'action-jump', href: '#' + action.anchor }, ['Open finding']),
+                ]),
+              )
+            })
+            exec.appendChild(actions)
+          }
+
+          section.appendChild(exec)
+          section.appendChild(el('p', { class: 'reading-hint' }, ['Need proof? Expand findings, feature-gate path, or the full facet table below.']))
+          return section
+        }
+
+        function execStat(tone, value, label) {
+          return el('div', { class: 'exec-stat', 'data-tone': tone }, [
+            el('b', {}, [String(value ?? 0)]),
+            el('span', {}, [label]),
+          ])
+        }
+
         function renderSnapshot(data) {
-          const section = sectionShell('snapshot', 'Snapshot', 'Immutable head and diff anchors for staleness checks.')
+          const section = sectionShell('snapshot', 'Snapshot', 'Head, base, and diff anchors for staleness checks.')
+          const fold = el('details', { class: 'fold' })
+          fold.appendChild(el('summary', {}, ['Show revision anchors (H0, base, diff)']))
+          const body = el('div', { class: 'fold-body' })
           const row = el('div', { class: 'meta-row' })
           row.appendChild(metaChip('Head H0', data.snapshot?.h0, 'h0'))
           row.appendChild(metaChip('Base', data.snapshot?.base, 'base'))
@@ -847,9 +1078,9 @@
           row.appendChild(
             metaChip('QA', String(data.qa?.status || 'not-run').toUpperCase(), null, false),
           )
-          section.appendChild(row)
+          body.appendChild(row)
           if (data.failedNodes?.length) {
-            section.appendChild(
+            body.appendChild(
               el('div', { class: 'gate-banner', style: 'margin-top:10px;border-color:var(--unverified-line)' }, [
                 el('strong', {}, [String(data.failedNodes.length) + ' reviewer node(s) failed']),
                 el('p', { style: 'margin:0;color:var(--muted)' }, [
@@ -858,16 +1089,9 @@
               ]),
             )
           }
+          fold.appendChild(body)
+          section.appendChild(fold)
           return section
-        }
-
-        function renderMetrics(data) {
-          const wrap = el('div', { class: 'metrics', role: 'group', 'aria-label': 'Review counts' })
-          wrap.appendChild(metric('blocking', 'Blocking', data.counts?.blocking))
-          wrap.appendChild(metric('passable', 'Non-blocking', data.counts?.nonBlocking))
-          wrap.appendChild(metric('unverified', 'Unverified claims', data.counts?.unverifiedFindings))
-          wrap.appendChild(metric('unverified', 'Unverified facets', data.counts?.facetsUnverified))
-          return wrap
         }
 
         function renderFindings(data) {
@@ -895,8 +1119,7 @@
           if (finding.executionPath?.length)
             kv.appendChild(kvRow('Path', finding.executionPath.join(' → ')))
           if (finding.violatedContract) kv.appendChild(kvRow('Contract', finding.violatedContract))
-          if (finding.evidence?.length)
-            kv.appendChild(kvRow('Evidence', finding.evidence.map(linkText).join('<br>'), true))
+          if (finding.evidence?.length) kv.appendChild(kvEvidenceRow('Evidence', finding.evidence))
           if (finding.disconfirmingReason)
             kv.appendChild(kvRow('Disconfirm', finding.disconfirmingReason))
           if (finding.suggestedFix) kv.appendChild(kvRow('Fix', finding.suggestedFix))
@@ -925,7 +1148,10 @@
                 ]),
                 el('button', { class: 'copy', type: 'button', 'data-copy-hash': 'finding-' + finding.id }, ['Copy link']),
               ]),
-              el('p', { style: 'margin:8px 0 0;color:var(--muted)' }, [finding.summary]),
+              el('p', { class: 'finding-lede' }, [finding.summary]),
+              finding.suggestedFix
+                ? el('p', { class: 'finding-fix' }, [el('strong', {}, ['Suggested fix. ']), finding.suggestedFix])
+                : null,
               details,
             ]),
           ])
@@ -950,11 +1176,10 @@
           }
           banner.appendChild(keys)
           if (data.featureGate?.evidence?.length) {
-            banner.appendChild(
-              el('p', { style: 'margin:0;color:var(--faint);font-size:12px' }, [
-                html('Evidence: ' + data.featureGate.evidence.map(linkText).join(' · ')),
-              ]),
-            )
+            const evidence = el('p', { style: 'margin:0;color:var(--faint);font-size:12px' })
+            evidence.appendChild(document.createTextNode('Evidence: '))
+            appendLinkedList(evidence, data.featureGate.evidence, ' · ')
+            banner.appendChild(evidence)
           }
           section.appendChild(banner)
 
@@ -1005,7 +1230,7 @@
                 el('td', { class: 'mono' }, [row.id]),
                 el('td', {}, [el('span', { class: 'status', 'data-tone': tone }, [row.status])]),
                 el('td', {}, [row.summary]),
-                el('td', {}, [html((row.evidence || []).map(linkText).join('; '))]),
+                el('td', {}, [linkedCell(row.evidence)]),
               ]),
             )
           }
@@ -1045,9 +1270,7 @@
                 el('div', { class: 'finding-body' }, [
                   el('h3', { class: 'finding-title' }, [row.persona + ' / ' + row.id]),
                   el('p', { style: 'margin:6px 0 0;color:var(--muted)' }, [row.summary]),
-                  el('p', { style: 'margin:8px 0 0;color:var(--faint);font-size:12px' }, [
-                    html((row.evidence || []).map(linkText).join(' · ')),
-                  ]),
+                  linkedParagraph(row.evidence, 'margin:8px 0 0;color:var(--faint);font-size:12px'),
                 ]),
               ]),
             )
@@ -1198,19 +1421,58 @@
           return el('span', { class: 'tag', 'data-tone': tone || 'muted' }, [label])
         }
 
-        function kvRow(label, value, asHtml = false) {
+        function kvRow(label, value) {
           const dd = el('dd', {})
-          if (asHtml || (typeof value === 'string' && value.includes('<'))) dd.appendChild(html(String(value)))
-          else dd.appendChild(document.createTextNode(String(value ?? '')))
+          appendLinkedText(dd, value)
           return el('div', {}, [el('dt', {}, [label]), dd])
         }
 
-        function linkText(value) {
-          const text = String(value ?? '')
-          return text.replace(/\bhttps?:\/\/[^\s<>"']+/g, (url) => {
-            const safe = escapeAttr(url)
-            return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`
-          })
+        function kvEvidenceRow(label, items) {
+          const dd = el('dd', {})
+          appendLinkedList(dd, items, '\n')
+          return el('div', {}, [el('dt', {}, [label]), dd])
+        }
+
+        const URL_RE = /\bhttps?:\/\/[^\s<>"']+/g
+
+        function appendLinkedText(parent, text) {
+          const raw = String(text ?? '')
+          let last = 0
+          for (const match of raw.matchAll(URL_RE)) {
+            const url = match[0]
+            const start = match.index ?? 0
+            if (start > last) parent.appendChild(document.createTextNode(raw.slice(last, start)))
+            const link = document.createElement('a')
+            link.href = url
+            link.target = '_blank'
+            link.rel = 'noopener noreferrer'
+            link.textContent = url
+            parent.appendChild(link)
+            last = start + url.length
+          }
+          if (last < raw.length) parent.appendChild(document.createTextNode(raw.slice(last)))
+          return parent
+        }
+
+        function appendLinkedList(parent, items, separator) {
+          const list = items || []
+          for (let i = 0; i < list.length; i++) {
+            if (i) parent.appendChild(document.createTextNode(separator))
+            appendLinkedText(parent, list[i])
+          }
+          return parent
+        }
+
+        function linkedCell(items) {
+          const cell = document.createDocumentFragment()
+          appendLinkedList(cell, items || [], '; ')
+          return cell
+        }
+
+        function linkedParagraph(items, style) {
+          const p = el('p', { style })
+          appendLinkedList(p, items || [], ' · ')
+          return p
         }
 
         function buildSearchText(finding) {
@@ -1252,24 +1514,6 @@
           } catch {
             return iso
           }
-        }
-
-        function escapeHtml(value) {
-          return String(value ?? '')
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('"', '&quot;')
-        }
-
-        function escapeAttr(value) {
-          return escapeHtml(value).replaceAll("'", '&#39;')
-        }
-
-        function html(value) {
-          const template = document.createElement('template')
-          template.innerHTML = value
-          return template.content
         }
 
         function el(tag, attrs, kids) {

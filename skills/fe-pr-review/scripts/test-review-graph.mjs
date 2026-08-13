@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
 import { PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, discoverRunners, makePlan, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateSynthesis } from './review-graph.mjs'
+import { buildReportDocument } from './lib/report.mjs'
 
 assert.deepEqual(parseArgs(['run', '--max-workers', '3', '--dry-run']), { command: 'run', maxWorkers: '3', dryRun: true })
 assert.deepEqual(selectPersonas(['src/server.ts']), ['repository-contract', 'correctness-platform', 'privacy-security-data'])
@@ -218,6 +219,45 @@ try {
   assert.ok(report.html.includes('id="fe-review-report"'))
   assert.ok(!report.html.includes('__FE_REVIEW_REPORT_JSON__'))
   assert.ok(report.html.includes('Every review facet'))
+  assert.ok(report.html.includes('Executive summary'))
+  const duplicateDoc = buildReportDocument({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: {
+      blocking: [
+        { ...candidate.findings[0], title: 'Duplicate title' },
+        { ...candidate.findings[0], title: 'Duplicate title' },
+      ],
+      nonBlocking: [],
+      unverified: [],
+      verdict: 'blocked',
+      rationale: 'dup ids',
+    },
+    qa: { status: 'not-run' },
+    nodeResults: [],
+    selected: [],
+    coverage: [],
+  })
+  assert.equal(new Set(duplicateDoc.findings.map((f) => f.id)).size, duplicateDoc.findings.length)
+  const xssDoc = buildReportDocument({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'x' },
+    qa: { status: 'not-run' },
+    nodeResults: [],
+    selected: ['rollout-gates'],
+    coverage: [{ persona: 'rollout-gates', id: 'fg-off-path', status: 'checked', summary: 'ok', evidence: ['<img src=x onerror=alert(1)>'] }],
+    featureGate: { status: 'required', keys: ['k'], rationale: 'r', evidence: ['<script>alert(1)</script>'] },
+  })
+  const xssHtml = buildReviewReport({
+    snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+    synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'x' },
+    qa: { status: 'not-run' },
+    nodeResults: [{ persona: 'rollout-gates', status: 'ok', value: gateCandidate }],
+    selected: ['rollout-gates'],
+    coverage: xssDoc.coverage,
+    featureGate: xssDoc.featureGate,
+  }).html
+  assert.ok(!xssHtml.includes('<img src=x onerror'), 'raw HTML tags must not appear unescaped in the report file')
+  assert.ok(xssHtml.includes('u003c'), 'angle brackets in payload should be escaped before embed')
   const help = fs.readFileSync(new URL('../SKILL.md', import.meta.url), 'utf8')
   for (const marker of ['qa-demo', 'H0', 'UNVERIFIED', 'Agent agreement is not proof', 'review-graph.mjs']) assert.ok(help.includes(marker), `missing ${marker}`)
 } finally { fs.rmSync(temp, { recursive: true, force: true }) }
