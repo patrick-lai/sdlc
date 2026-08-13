@@ -141,7 +141,7 @@ for (const marker of ['not-run', 'stale', 'candidates.json', 'Runner safety', 'F
 const fePersonas = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/personas.md'), 'utf8')
 const personaIds = ['repository-contract', 'correctness-platform', 'accessibility-ui', 'rollout-gates', 'privacy-security-data', 'product-tests']
 for (const id of personaIds) assert.ok(fePersonas.includes(id), `personas reference missing ${id}`)
-for (const marker of ['Historical regression probes', 'CI-surface parity', 'runtime config substitution', 'dynamic-key boundaries', 'temporal history/cache', 'side-effect liveness', 'test-oracle validity']) {
+for (const marker of ['Historical regression probes', 'CI-surface parity', 'runtime/service-descriptor substitution', 'dynamic-key boundaries', 'temporal history/cache', 'side-effect liveness', 'test-oracle validity']) {
   assert.ok(fePersonas.includes(marker), `personas reference missing historical probe marker: ${marker}`)
 }
 
