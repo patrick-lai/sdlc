@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mergeAccessibilityScans, assertNoBlockingViolations } from '../skills/qa-demo/scripts/a11y-scan.mjs'
+import { resolveSmokeMode } from '../skills/qa-demo/scripts/smoke-target.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -67,9 +68,16 @@ for (const marker of [
   'axe-core',
   'scanAccessibility',
   'a11y-summary.json',
+  'SDLC_SMOKE_MODE',
 ]) {
   assert.ok(qa.includes(marker), `qa-demo missing pressure-test contract: ${marker}`)
 }
+
+assert.equal(resolveSmokeMode('https://demo.playwright.dev/todomvc/'), 'todomvc')
+assert.equal(resolveSmokeMode('https://example.com/'), 'example')
+assert.equal(resolveSmokeMode('http://127.0.0.1:4173/preview'), 'generic')
+assert.equal(resolveSmokeMode('http://127.0.0.1:4173/', 'todo'), 'todomvc')
+assert.throws(() => resolveSmokeMode('https://example.com/', 'unknown'), /Unsupported SDLC_SMOKE_MODE/)
 
 const a11ySummary = mergeAccessibilityScans([
   {

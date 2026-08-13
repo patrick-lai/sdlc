@@ -227,7 +227,15 @@ Validate the toolchain anytime with the bundled smoke:
 ```bash
 # from this skill directory (or repo root via npm run smoke:testreel)
 node scripts/smoke-testreel.mjs
+
+# Custom target: auto-detects TodoMVC/example.com, otherwise generic navigation mode
+SDLC_SMOKE_URL=http://127.0.0.1:4173 node scripts/smoke-testreel.mjs
+
+# Force target-specific interactions when the URL does not identify the app
+SDLC_SMOKE_URL=http://127.0.0.1:4173 SDLC_SMOKE_MODE=todomvc node scripts/smoke-testreel.mjs
 ```
+
+`SDLC_SMOKE_MODE` accepts `todomvc`, `example`, or `generic`. The bundled smoke is a toolchain diagnostic: it prints PASS or PARTIAL for its target, but a PARTIAL smoke is never product proof. Deliverable runners must enforce the blocking policy in §7.
 
 ### 7. Prove interactions and accessibility
 

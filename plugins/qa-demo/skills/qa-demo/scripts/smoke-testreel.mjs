@@ -12,7 +12,8 @@
  *   node scripts/smoke-testreel.mjs
  *
  * Env:
- *   SDLC_SMOKE_URL   Override target URL
+ *   SDLC_SMOKE_URL    Override target URL
+ *   SDLC_SMOKE_MODE   Optional: todomvc | example | generic
  *   SDLC_SMOKE_OUT   Output directory (default: ./testreel-output/smoke)
  */
 
@@ -22,6 +23,7 @@ import { mkdtempSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { resolveSmokeMode } from './smoke-target.mjs'
 
 const requireHere = createRequire(import.meta.url)
 
@@ -132,12 +134,16 @@ async function main() {
     const axeSource = loadFrom(root, 'axe-core').source
     const a11yScans = []
 
-    let url = process.env.SDLC_SMOKE_URL || DEFAULT_URL
-    const useTodoMvc = !process.env.SDLC_SMOKE_URL && (await urlReachable(DEFAULT_URL))
-    if (!process.env.SDLC_SMOKE_URL && !useTodoMvc) {
+    const overrideUrl = process.env.SDLC_SMOKE_URL
+    let url = overrideUrl || DEFAULT_URL
+    if (overrideUrl && !(await urlReachable(overrideUrl))) {
+      throw new Error(`SDLC_SMOKE_URL is unreachable: ${overrideUrl}`)
+    }
+    if (!overrideUrl && !(await urlReachable(DEFAULT_URL))) {
       console.warn(`[smoke] ${DEFAULT_URL} unreachable; falling back to ${FALLBACK_URL}`)
       url = FALLBACK_URL
     }
+    const smokeMode = resolveSmokeMode(url, process.env.SDLC_SMOKE_MODE)
 
     const format = hasFfmpeg() ? 'mp4' : 'webm'
     console.log(`[smoke] Recording narrated demo → ${url}`)
@@ -181,7 +187,7 @@ async function main() {
     await page.waitForTimeout(2000)
     await showCursor(page)
 
-    if (useTodoMvc || url.includes('todomvc')) {
+    if (smokeMode === 'todomvc') {
       await updateCaption(page, {
         kicker: '01 · add',
         claim: 'New todo is typed into the list',
@@ -218,7 +224,7 @@ async function main() {
         storyId: 'smoke--todomvc-completed',
         exclude: ['#__sdlc_caption'],
       }))
-    } else {
+    } else if (smokeMode === 'example') {
       await updateCaption(page, {
         kicker: 'Fallback',
         claim: 'Example Domain heading is visible',
@@ -233,6 +239,23 @@ async function main() {
         axeSource,
         label: 'Example Domain fallback',
         storyId: 'smoke--example-domain',
+        exclude: ['#__sdlc_caption'],
+      }))
+    } else {
+      await updateCaption(page, {
+        kicker: 'Custom target',
+        claim: 'The configured page rendered successfully',
+        detail: 'Generic mode proves navigation, recording, captions, and accessibility scanning',
+      })
+      await page.locator('body').waitFor({ state: 'visible' })
+      await hideCursor(page)
+      await page.waitForTimeout(1600)
+      await showCursor(page)
+      await recorder.screenshot('custom-page')
+      a11yScans.push(await scanAccessibility(page, {
+        axeSource,
+        label: 'Custom smoke target',
+        storyId: 'smoke--custom-target',
         exclude: ['#__sdlc_caption'],
       }))
     }
