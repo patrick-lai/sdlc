@@ -255,8 +255,22 @@ try {
   })
   assert.ok(!failExec.executive.bullets.some((line) => /passed/i.test(line)), 'fresh FAIL QA must not read as passed')
   assert.ok(failExec.executive.bullets.some((line) => /failed/i.test(line)))
-  assert.ok(failExec.executive.decision)
-  assert.ok(failExec.executive.nextStep)
+  assert.ok(!/mergeable/i.test(failExec.executive.decision), 'fresh FAIL QA must not look mergeable')
+  assert.match(failExec.executive.decision, /QA/i)
+  assert.match(failExec.executive.nextStep, /QA/i)
+  for (const result of ['PARTIAL', 'BLOCKED']) {
+    const doc = buildReportDocument({
+      snapshot: { h0: head, base: 'base', diffHash: 'hash' },
+      synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'clear' },
+      qa: { status: 'fresh', revision: head, result, reason: result },
+      nodeResults: [],
+      selected: [],
+      coverage: [],
+    })
+    assert.ok(!/mergeable/i.test(doc.executive.decision), `fresh ${result} QA must not look mergeable`)
+    assert.match(doc.executive.nextStep, /QA/i)
+  }
+  assert.match(report.html, /try\s*\{\s*id\s*=\s*decodeURIComponent/)
   const duplicateDoc = buildReportDocument({
     snapshot: { h0: head, base: 'base', diffHash: 'hash' },
     synthesis: {

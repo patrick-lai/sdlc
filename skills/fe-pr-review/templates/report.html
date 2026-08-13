@@ -1757,8 +1757,14 @@
         }
 
         function revealHashTarget() {
-          const id = decodeURIComponent(location.hash.replace(/^#/, ''))
-          if (!id) return
+          const raw = location.hash.replace(/^#/, '')
+          if (!raw) return
+          let id = raw
+          try {
+            id = decodeURIComponent(raw)
+          } catch {
+            id = raw
+          }
           const target = document.getElementById(id)
           if (!target) return
           const details = target.querySelector('details')

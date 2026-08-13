@@ -50,6 +50,9 @@ function findingId(group, finding, index, used) {
 
 function buildExecutiveSummary({ verdict, counts, qa, featureGate, findings, failedNodes }) {
   const blocking = findings.filter((f) => f.group === 'blocking')
+  const qaOutcome = qa.status === 'fresh' ? String(qa.result || '').toUpperCase() : ''
+  const qaBlocksApproval = qa.status === 'fresh' && ['FAIL', 'PARTIAL', 'BLOCKED'].includes(qaOutcome)
+
   const headline =
     verdict.value === 'blocked'
       ? 'Not ready to merge — fix blocking issues first.'
@@ -60,16 +63,20 @@ function buildExecutiveSummary({ verdict, counts, qa, featureGate, findings, fai
   const decision =
     verdict.value === 'blocked'
       ? 'Do not merge yet.'
-      : verdict.value === 'passable'
-        ? 'Looks mergeable after a quick scan.'
-        : 'Incomplete review — do not treat this as a pass.'
+      : qaBlocksApproval
+        ? 'Investigate visual QA before approving.'
+        : verdict.value === 'passable'
+          ? 'Looks mergeable after a quick scan.'
+          : 'Incomplete review — do not treat this as a pass.'
 
   const nextStep =
     verdict.value === 'blocked'
       ? 'Open each blocking finding, then confirm the suggested fix.'
-      : verdict.value === 'passable'
-        ? 'Scan notes and QA, then you can approve.'
-        : 'Read limitations and failed coverage before deciding.'
+      : qaBlocksApproval
+        ? 'Open the QA section and resolve the FAIL, PARTIAL, or BLOCKED result first.'
+        : verdict.value === 'passable'
+          ? 'Scan notes and QA, then you can approve.'
+          : 'Read limitations and failed coverage before deciding.'
 
   const bullets = []
   bullets.push(
