@@ -215,6 +215,9 @@ try {
   assert.ok(report.markdown.includes('No matching story'))
   assert.equal(report.coverage.length, PERSONA_FACETS['rollout-gates'].length)
   assert.ok(report.html.includes('Full feature-gate path'))
+  assert.ok(report.html.includes('id="fe-review-report"'))
+  assert.ok(!report.html.includes('__FE_REVIEW_REPORT_JSON__'))
+  assert.ok(report.html.includes('Every review facet'))
   const help = fs.readFileSync(new URL('../SKILL.md', import.meta.url), 'utf8')
   for (const marker of ['qa-demo', 'H0', 'UNVERIFIED', 'Agent agreement is not proof', 'review-graph.mjs']) assert.ok(help.includes(marker), `missing ${marker}`)
 } finally { fs.rmSync(temp, { recursive: true, force: true }) }

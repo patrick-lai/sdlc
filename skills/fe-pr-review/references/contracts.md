@@ -39,7 +39,7 @@ The run directory defaults outside the repository; an explicit `--output` inside
 
 ## Review report
 
-Successful synthesis deterministically writes `report.json`, `report.md`, and self-contained `report.html`. All identify `H0`, verdict, QA freshness, the feature-gate requirement and full path, every facet with evidence or limitation, detailed findings, and unverified coverage. Upload success and URL reachability are checked separately.
+Successful synthesis deterministically writes `report.json`, `report.md`, and self-contained `report.html`. All identify `H0`, verdict, QA freshness, the feature-gate requirement and full path, every facet with evidence or limitation, detailed findings, and unverified coverage. HTML is rendered from `templates/report.html` via `scripts/lib/report.mjs` — agents must not invent alternate markup. Upload success and URL reachability are checked separately.
 
 ## Audit
 
