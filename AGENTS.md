@@ -39,7 +39,7 @@ Claude Code plugin marketplace:
 /plugin install qa-demo@sdlc
 ```
 
-Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`. Plugin mirrors under `plugins/` (keep in sync after skill edits).
+Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`, `skills/fe-pr-review/`. Plugin mirrors under `plugins/` (keep in sync after skill edits).
 
 ## Repo map
 
@@ -55,4 +55,5 @@ Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`. Plugin 
 1. Edit **`skills/<name>`** first; refresh the matching plugin mirror when the skill changes.
 2. For **qa-demo**: prefer **TestReel + caption helper** paths documented in the skill; do not invent a second caption system. Runtime deps (`testreel`, `playwright`, optional `ffmpeg`) are installed by runners/smoke — not vendored in the skill tree.
 3. For **pr-warden**: preserve the public provider-neutral policy in `skills/pr-warden/scripts/lib/`. Never auto-merge or approve. Code-change automation is PR-source-branch only, trusted paths only, and bounded to three attempts. Keep one skill tree; plugin copies are mirrors, not alternate sources of truth.
-4. Keep project skill installs on **`.agents/skills/`**; use **`.claude`** only for Claude-specific packaging or compatibility links.
+4. For **fe-pr-review**: keep reviewer subprocesses read-only, preserve immutable-head and structured-evidence contracts, and delegate visual proof to `qa-demo`. The graph runner never performs provider mutations.
+5. Keep project skill installs on **`.agents/skills/`**; use **`.claude`** only for Claude-specific packaging or compatibility links.
