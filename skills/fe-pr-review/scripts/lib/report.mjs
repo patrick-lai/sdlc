@@ -194,6 +194,12 @@ export function buildReportDocument({
   )
 
   const failedNodes = nodeResults.filter((node) => node.status !== 'ok')
+  const operationalFollowUps = (synthesis?.operationalFollowUps || []).map((item) => ({
+    title: item?.title || 'Follow-up',
+    summary: item?.summary || item?.detail || '',
+    affectsVerdict: Boolean(item?.affectsVerdict),
+    verdictImpact: item?.verdictImpact || 'none',
+  }))
   const verdict = {
     value: synthesis?.verdict || 'unverified',
     ...(VERDICT_META[synthesis?.verdict || 'unverified'] || VERDICT_META.unverified),
@@ -254,6 +260,7 @@ export function buildReportDocument({
     counts,
     selected,
     findings,
+    operationalFollowUps,
     gatePath,
     coverage: rows,
     limitations: rows
@@ -337,6 +344,15 @@ export function buildReviewMarkdown(document) {
   }
 
   lines.push(
+    '## Operational follow-ups',
+    '',
+    ...(d.operationalFollowUps?.length
+      ? d.operationalFollowUps.map(
+          (item) =>
+            `- **${item.title}** — **${item.affectsVerdict ? `verdict impact: ${item.verdictImpact}` : 'no verdict impact'}**: ${item.summary}`,
+        )
+      : ['- None.']),
+    '',
     '## QA evidence',
     '',
     `- **Status:** ${d.qa.status}`,
@@ -399,6 +415,7 @@ export function buildReviewReport(input) {
     featureGate: document.featureGate,
     coverage,
     qa: { ...input.qa, content: undefined },
+    operationalFollowUps: document.operationalFollowUps,
     markdown,
     html,
   }

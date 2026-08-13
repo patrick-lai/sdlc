@@ -979,6 +979,7 @@
           { id: 'findings', title: 'Findings' },
           { id: 'feature-gate', title: 'Feature gate' },
           { id: 'coverage', title: 'Every review facet' },
+          { id: 'follow-ups', title: 'Follow-ups' },
           { id: 'qa', title: 'QA evidence' },
           { id: 'limitations', title: 'Limitations' },
         ]
@@ -995,6 +996,7 @@
         app.appendChild(renderFindings(data))
         app.appendChild(renderFeatureGate(data))
         app.appendChild(renderCoverage(data))
+        app.appendChild(renderFollowUps(data))
         app.appendChild(renderQa(data))
         app.appendChild(renderLimitations(data))
         app.appendChild(
@@ -1237,6 +1239,31 @@
           table.appendChild(body)
           wrap.appendChild(table)
           return wrap
+        }
+
+        function renderFollowUps(data) {
+          const section = sectionShell('follow-ups', 'Operational follow-ups', 'Owner tasks and rollout steps that do not always affect the code verdict.')
+          if (!data.operationalFollowUps?.length) {
+            section.appendChild(el('p', { class: 'empty' }, ['None.']))
+            return section
+          }
+          const list = el('div', { class: 'card-list' })
+          for (const item of data.operationalFollowUps) {
+            list.appendChild(
+              el('article', { class: 'finding' }, [
+                el('div', { class: 'finding-rail', style: 'background:var(--accent)' }),
+                el('div', { class: 'finding-body' }, [
+                  el('h3', { class: 'finding-title' }, [item.title]),
+                  el('p', { class: 'finding-lede' }, [item.summary]),
+                  el('div', { class: 'finding-meta' }, [
+                    tag(item.affectsVerdict ? `verdict: ${item.verdictImpact}` : 'no verdict impact', item.affectsVerdict ? 'unverified' : 'muted'),
+                  ]),
+                ]),
+              ]),
+            )
+          }
+          section.appendChild(list)
+          return section
         }
 
         function renderQa(data) {
