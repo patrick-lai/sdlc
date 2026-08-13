@@ -32,7 +32,7 @@ function assertMirror(name) {
   }
 }
 
-for (const name of ['pr-warden', 'qa-demo']) assertMirror(name)
+for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review']) assertMirror(name)
 
 const publicRoots = ['README.md', '.claude-plugin', 'skills', 'plugins', 'fixtures']
 const textExtensions = new Set(['.md', '.json', '.mjs', '.js', '.html', '.txt', '.yaml', '.yml'])
@@ -111,4 +111,74 @@ for (const marker of ['Never merge', '--html', 'GitHub', 'Bitbucket', '3 automat
   assert.ok(warden.includes(marker), `pr-warden missing public contract: ${marker}`)
 }
 
-console.log('PASS: public skill contracts, mirrors, and internal-leak guard')
+const feReview = fs.readFileSync(path.join(root, 'skills/fe-pr-review/SKILL.md'), 'utf8')
+for (const marker of [
+  'qa-demo',
+  'H0',
+  'UNVERIFIED',
+  'Agent agreement is not proof',
+  'review-graph.mjs',
+  '--dry-run',
+  '--qa-report',
+  'audit.json',
+  'read-only',
+  'full feature-gate path',
+  'report.html',
+  'Statlas',
+  'every facet',
+]) {
+  assert.ok(feReview.includes(marker), `fe-pr-review missing public contract: ${marker}`)
+}
+
+const feContracts = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/contracts.md'), 'utf8')
+for (const marker of ['not-run', 'stale', 'candidates.json', 'Runner safety', 'Filesystem safety', 'gateRequirement', 'report.json']) {
+  assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing: ${marker}`)
+}
+
+const fePersonas = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/personas.md'), 'utf8')
+const personaIds = ['repository-contract', 'correctness-platform', 'accessibility-ui', 'rollout-gates', 'privacy-security-data', 'product-tests']
+for (const id of personaIds) assert.ok(fePersonas.includes(id), `personas reference missing ${id}`)
+
+const feGraph = fs.readFileSync(path.join(root, 'skills/fe-pr-review/scripts/review-graph.mjs'), 'utf8')
+for (const id of personaIds) assert.ok(feGraph.includes(`'${id}'`), `review-graph missing persona ${id}`)
+for (const facet of ['fg-requirement', 'fg-off-path', 'fg-on-path-states', 'fg-persistence-rollback', 'fg-tests', 'fg-cleanup']) assert.ok(feGraph.includes(`'${facet}'`), `review-graph missing gate facet ${facet}`)
+assert.ok(!/^import .* from '(?!node:)/m.test(feGraph), 'review-graph must stay dependency-free')
+for (const forbidden of [/--dangerously/, /--yolo/, /bypassPermissions/, /https?:\/\/(?!github\.com|example)/]) {
+  assert.ok(!forbidden.test(feGraph), `review-graph must not contain ${forbidden}`)
+}
+
+// Every declared package script must point at a file that exists.
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+for (const [name, script] of Object.entries(pkg.scripts)) {
+  const target = script.match(/(?:^|\s)((?:skills|scripts)\/[^\s]+\.mjs)/)?.[1]
+  if (target) assert.ok(fs.existsSync(path.join(root, target)), `script ${name} points at missing ${target}`)
+}
+for (const required of ['test:skills', 'test:pr-warden', 'test:fe-pr-review', 'smoke:install']) {
+  assert.ok(pkg.scripts[required], `package.json missing script ${required}`)
+}
+assert.ok(pkg.files.includes('skills') && pkg.files.includes('plugins'), 'package files must ship skills and plugins')
+assert.equal(Object.keys(pkg.dependencies || {}).length, 0, 'skills must stay dependency-free')
+assert.equal(Object.keys(pkg.devDependencies || {}).length, 0, 'skills must stay dependency-free')
+
+// Marketplace entries must resolve to a real plugin with a matching manifest.
+const marketplace = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin/marketplace.json'), 'utf8'))
+const marketplaceNames = marketplace.plugins.map((entry) => entry.name)
+for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review']) {
+  assert.ok(marketplaceNames.includes(name), `marketplace missing plugin ${name}`)
+  const entry = marketplace.plugins.find((plugin) => plugin.name === name)
+  assert.equal(entry.source, `./plugins/${name}`)
+  assert.deepEqual(entry.skills, [`./skills/${name}`])
+  const manifestPath = path.join(root, 'plugins', name, '.claude-plugin/plugin.json')
+  assert.ok(fs.existsSync(manifestPath), `missing plugin manifest for ${name}`)
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+  assert.equal(manifest.name, name)
+  assert.equal(manifest.version, entry.version, `${name} plugin/marketplace version drift`)
+  assert.ok(fs.existsSync(path.join(root, 'plugins', name, 'skills', name, 'SKILL.md')))
+}
+
+const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8')
+for (const marker of ['fe-pr-review', 'npm run test:fe-pr-review', 'plugins/fe-pr-review']) {
+  assert.ok(readme.includes(marker), `README missing fe-pr-review reference: ${marker}`)
+}
+
+console.log('PASS: public skill contracts, mirrors, packaging, and internal-leak guard')

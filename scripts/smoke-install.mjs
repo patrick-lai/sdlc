@@ -19,7 +19,7 @@ function run(command, args) {
 
 try {
   fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"sdlc-install-smoke","private":true}\n')
-  for (const skill of ['pr-warden', 'qa-demo']) {
+  for (const skill of ['pr-warden', 'qa-demo', 'fe-pr-review']) {
     run('npx', ['-y', 'skills', 'add', root, '--skill', skill, '-a', 'cursor', '-y'])
     assert.ok(fs.existsSync(path.join(temp, '.agents', 'skills', skill, 'SKILL.md')))
   }
@@ -31,7 +31,20 @@ try {
   assert.equal(parsed.link.key.number, 2)
   assert.ok(fs.existsSync(path.join(temp, '.agents/skills/qa-demo/scripts/caption-overlay.mjs')))
   assert.ok(fs.existsSync(path.join(temp, '.agents/skills/qa-demo/scripts/a11y-scan.mjs')))
-  console.log(`PASS: installed pr-warden + qa-demo into ${path.join(temp, '.agents/skills')}`)
+  for (const file of [
+    'scripts/review-graph.mjs',
+    'scripts/test-review-graph.mjs',
+    'references/personas.md',
+    'references/contracts.md',
+  ]) {
+    assert.ok(fs.existsSync(path.join(temp, '.agents/skills/fe-pr-review', file)), `fe-pr-review install missing ${file}`)
+  }
+
+  // The installed graph runner must plan without a provider, a model call, or a network hop.
+  const graph = path.join(temp, '.agents/skills/fe-pr-review/scripts/review-graph.mjs')
+  assert.ok(run(process.execPath, [graph, 'help']).includes('review-graph.mjs plan'))
+
+  console.log(`PASS: installed pr-warden + qa-demo + fe-pr-review into ${path.join(temp, '.agents/skills')}`)
 } finally {
   fs.rmSync(temp, { recursive: true, force: true })
 }

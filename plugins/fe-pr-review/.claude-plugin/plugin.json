@@ -1,0 +1,12 @@
+{
+  "name": "fe-pr-review",
+  "description": "Provider-neutral frontend PR review with read-only multi-agent fan-out, synthesis, and qa-demo evidence.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "repository": "https://github.com/patrick-lai/sdlc",
+  "license": "MIT",
+  "keywords": ["pull-request", "frontend", "review", "multi-agent", "accessibility", "qa"]
+}

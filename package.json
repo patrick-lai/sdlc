@@ -25,7 +25,10 @@
     "demo",
     "pr-warden",
     "bitbucket",
-    "jira"
+    "jira",
+    "fe-pr-review",
+    "multi-agent-review",
+    "accessibility-review"
   ],
   "files": [
     "skills",
@@ -42,6 +45,7 @@
     "smoke:testreel": "node skills/qa-demo/scripts/smoke-testreel.mjs",
     "test:skills": "node scripts/test-skill-contracts.mjs",
     "test:pr-warden": "node skills/pr-warden/scripts/test-adapter.mjs",
-    "pr-warden": "node skills/pr-warden/scripts/adapter.mjs"
+    "pr-warden": "node skills/pr-warden/scripts/adapter.mjs",
+    "test:fe-pr-review": "node skills/fe-pr-review/scripts/test-review-graph.mjs"
   }
 }

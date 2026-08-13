@@ -14,6 +14,7 @@ npx skills add patrick-lai/sdlc
 |-------|----------------|
 | **qa-demo** | Open a target repo/PR, boot Storybook or the best available demo surface, prove the feature end-to-end, and record a polished narrated [TestReel](https://github.com/greentfrapp/testreel) video |
 | **pr-warden** | Keep GitHub or Bitbucket PRs healthy with provider-neutral reads, bounded trusted-path repairs, and a permanent **never merge** rule. |
+| **fe-pr-review** | Fan out 3–6 read-only frontend review personas, synthesize their evidence, and fold in a `qa-demo` run without depending on one forge or model vendor. |
 
 ## Install
 
@@ -32,6 +33,7 @@ Most agents share **one** project install root: **`.agents/skills/`**.
 # Preferred: one project install (Codex + Cursor + Grok all see it)
 npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -y
 npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
+npx skills add patrick-lai/sdlc --skill fe-pr-review -a cursor -y
 # equivalent project root for codex-only auto-detect:
 # npx skills add patrick-lai/sdlc --skill pr-warden -a codex -y
 
@@ -55,6 +57,23 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 /plugin marketplace add patrick-lai/sdlc
 /plugin install qa-demo@sdlc
 /plugin install pr-warden@sdlc
+/plugin install fe-pr-review@sdlc
+```
+
+## fe-pr-review
+
+Use it when a frontend PR needs independent accessibility, rollout, privacy, repository-contract, correctness, and product reviewers plus a separate synthesis pass:
+
+```text
+/fe-pr-review review <pull-request-url> and use qa-demo when the change is visual
+```
+
+The coordinator works with the authenticated forge integration already available to the agent. Its dependency-free graph runner snapshots one head, assigns 3–6 read-only personas across installed Claude Code, Codex CLI, and Cursor Agent routes, validates evidence for every declared facet, and runs a distinct synthesis node. Feature-gate review gets a prominent full-path trace from requirement decision through definition, evaluation, off/on behavior, exposure, SSR parity, rollback, tests, and cleanup. Visual proof stays with the installed `qa-demo` skill and can be attached with `--qa-report`. Every completed attempt emits self-contained `report.json`, `report.md`, and `report.html` artifacts; runner exhaustion produces an explicit `UNVERIFIED` report with all missing facets instead of silently omitting evidence. The graph runner fails over safe routes, serializes Cursor authentication, isolates Claude from inherited MCP configuration, and never comments, approves, merges, pushes, commits, or deploys.
+
+```bash
+node .agents/skills/fe-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main
+node .agents/skills/fe-pr-review/scripts/review-graph.mjs run --repo-root "$PWD" --base origin/main --dry-run
+npm run test:fe-pr-review
 ```
 
 ## pr-warden
@@ -80,9 +99,10 @@ node .agents/skills/pr-warden/scripts/adapter.mjs inspect \
 Repository checks:
 
 ```bash
-npm run smoke:install       # temp-project install of both skills
+npm run smoke:install       # temp-project install of all skills
 npm run test:pr-warden      # policy, providers, ledger, trusted paths
 npm run test:skills          # public-safe content + canonical/plugin parity
+npm run test:fe-pr-review    # fan-out routing, schemas, graph, QA handoff
 npm run smoke:testreel      # fresh captioned qa-demo recording
 ```
 
@@ -124,8 +144,10 @@ node skills/qa-demo/scripts/smoke-testreel.mjs
 ```text
 skills/qa-demo/                 # canonical skill (npx skills add)
 skills/pr-warden/               # canonical PR Warden pack + adapter
+skills/fe-pr-review/             # frontend review graph + provider-neutral runners
 plugins/qa-demo/                # Claude Code plugin package
 plugins/pr-warden/              # Claude Code plugin package
+plugins/fe-pr-review/            # Claude Code plugin package
 .claude-plugin/marketplace.json # marketplace catalog
 ```
 
@@ -134,6 +156,7 @@ Canonical skills live under `skills/`. After editing, refresh plugin mirrors:
 ```bash
 rm -rf plugins/qa-demo/skills/qa-demo && cp -a skills/qa-demo plugins/qa-demo/skills/qa-demo
 rm -rf plugins/pr-warden/skills/pr-warden && cp -a skills/pr-warden plugins/pr-warden/skills/pr-warden
+rm -rf plugins/fe-pr-review/skills/fe-pr-review && cp -a skills/fe-pr-review plugins/fe-pr-review/skills/fe-pr-review
 ```
 
 ## Links
