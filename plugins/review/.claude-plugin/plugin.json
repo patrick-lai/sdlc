@@ -1,0 +1,12 @@
+{
+  "name": "review",
+  "description": "Unified read-only code review for working trees, branches, and pull requests, with automatic frontend/backend routing.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "repository": "https://github.com/patrick-lai/sdlc",
+  "license": "MIT",
+  "keywords": ["code-review", "pull-request", "frontend", "backend", "full-stack", "multi-agent"]
+}
