@@ -32,7 +32,7 @@ function assertMirror(name) {
   }
 }
 
-for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review']) assertMirror(name)
+for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review']) assertMirror(name)
 
 const publicRoots = ['README.md', '.claude-plugin', 'skills', 'plugins', 'fixtures']
 const textExtensions = new Set(['.md', '.json', '.mjs', '.js', '.html', '.txt', '.yaml', '.yml'])
@@ -187,6 +187,29 @@ for (const id of bePersonaIds) assert.ok(beGraph.includes(`'${id}'`), `backend r
 for (const facet of ['mixed-version-deploy', 'transaction-partial-success', 'retry-idempotency', 'cancellation-deadlines', 'expand-migrate-contract', 'query-algorithm-resource', 'rollout-rollback', 'test-oracle-validity']) assert.ok(beGraph.includes(`'${facet}'`), `backend review graph missing facet ${facet}`)
 assert.ok(!/^import .* from '(?!node:|\.)/m.test(beGraph), 'backend review graph must stay dependency-free')
 
+const review = fs.readFileSync(path.join(root, 'skills/review/SKILL.md'), 'utf8')
+for (const marker of [
+  'name: review',
+  'current working-tree changes',
+  'explicit pull request',
+  'local/remote branch',
+  'fe-pr-review',
+  'be-pr-review',
+  'H0 = worktree:',
+  'staged and unstaged',
+  'untracked file',
+  'Do not route from extensions',
+  'frontend',
+  'backend',
+  'both',
+  'same target, base, complete snapshot, and logical `H0`',
+  'self-authored PR',
+  'PASSABLE',
+  'BLOCKED',
+  'UNVERIFIED',
+  'Never merge',
+]) assert.ok(review.includes(marker), `review missing unified routing contract: ${marker}`)
+
 // Every declared package script must point at a file that exists.
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 for (const [name, script] of Object.entries(pkg.scripts)) {
@@ -203,7 +226,7 @@ assert.equal(Object.keys(pkg.devDependencies || {}).length, 0, 'skills must stay
 // Marketplace entries must resolve to a real plugin with a matching manifest.
 const marketplace = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin/marketplace.json'), 'utf8'))
 const marketplaceNames = marketplace.plugins.map((entry) => entry.name)
-for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review']) {
+for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review']) {
   assert.ok(marketplaceNames.includes(name), `marketplace missing plugin ${name}`)
   const entry = marketplace.plugins.find((plugin) => plugin.name === name)
   assert.equal(entry.source, `./plugins/${name}`)
@@ -217,8 +240,8 @@ for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review']) {
 }
 
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8')
-for (const marker of ['fe-pr-review', 'npm run test:fe-pr-review', 'plugins/fe-pr-review', 'be-pr-review', 'npm run test:be-pr-review', 'plugins/be-pr-review']) {
-  assert.ok(readme.includes(marker), `README missing fe-pr-review reference: ${marker}`)
+for (const marker of ['fe-pr-review', 'npm run test:fe-pr-review', 'plugins/fe-pr-review', 'be-pr-review', 'npm run test:be-pr-review', 'plugins/be-pr-review', '/review', 'plugins/review']) {
+  assert.ok(readme.includes(marker), `README missing public skill reference: ${marker}`)
 }
 
 console.log('PASS: public skill contracts, mirrors, packaging, and internal-leak guard')

@@ -19,7 +19,7 @@ function run(command, args) {
 
 try {
   fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"sdlc-install-smoke","private":true}\n')
-  for (const skill of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review']) {
+  for (const skill of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review']) {
     run('npx', ['-y', 'skills', 'add', root, '--skill', skill, '-a', 'cursor', '-y'])
     assert.ok(fs.existsSync(path.join(temp, '.agents', 'skills', skill, 'SKILL.md')))
   }
@@ -53,7 +53,7 @@ try {
   const graph = path.join(temp, '.agents/skills/fe-pr-review/scripts/review-graph.mjs')
   assert.ok(run(process.execPath, [graph, 'help']).includes('review-graph.mjs plan'))
 
-  console.log(`PASS: installed pr-warden + qa-demo + fe-pr-review + be-pr-review into ${path.join(temp, '.agents/skills')}`)
+  console.log(`PASS: installed pr-warden + qa-demo + fe-pr-review + be-pr-review + review into ${path.join(temp, '.agents/skills')}`)
 } finally {
   fs.rmSync(temp, { recursive: true, force: true })
 }

@@ -14,6 +14,7 @@ npx skills add patrick-lai/sdlc
 |-------|----------------|
 | **qa-demo** | Open a target repo/PR, boot Storybook or the best available demo surface, prove the feature end-to-end, and record a polished narrated [TestReel](https://github.com/greentfrapp/testreel) video |
 | **pr-warden** | Keep GitHub or Bitbucket PRs healthy with provider-neutral reads, bounded trusted-path repairs, and a permanent **never merge** rule. |
+| **review** | Review a working tree, current/own PR, explicit PR, or arbitrary branch; automatically route to frontend, backend, or both and return one verdict. |
 | **fe-pr-review** | Fan out 3–6 read-only frontend review personas, synthesize their evidence, and fold in a `qa-demo` run without depending on one forge or model vendor. |
 | **be-pr-review** | Fan out 3–6 backend reviewers across contracts, data, reliability, security, performance, tests, and rollout, then adversarially synthesize revision-bound evidence. |
 
@@ -36,6 +37,7 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -y
 npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
 npx skills add patrick-lai/sdlc --skill fe-pr-review -a cursor -y
 npx skills add patrick-lai/sdlc --skill be-pr-review -a cursor -y
+npx skills add patrick-lai/sdlc --skill review -a cursor -y
 # equivalent project root for codex-only auto-detect:
 # npx skills add patrick-lai/sdlc --skill pr-warden -a codex -y
 
@@ -61,7 +63,21 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 /plugin install pr-warden@sdlc
 /plugin install fe-pr-review@sdlc
 /plugin install be-pr-review@sdlc
+/plugin install review@sdlc
 ```
+
+## review
+
+Use one command whether the target is frontend, backend, or full-stack:
+
+```text
+/review                         # dirty working tree, current PR, or current branch
+/review my PR                   # unique open PR for the current branch
+/review https://github.com/OWNER/REPO/pull/123
+/review origin/feature-branch
+```
+
+The skill resolves one immutable target without switching branches, includes staged, unstaged, and non-ignored untracked files for a dirty checkout, and classifies changed behavior from contracts rather than extensions alone. It then composes `fe-pr-review`, `be-pr-review`, or both on the same `H0`, rechecks for source movement, deduplicates cross-boundary findings, and returns one `PASSABLE`, `BLOCKED`, or `UNVERIFIED` verdict. Self-authored PRs are valid for private preflight review but are never approved or represented as independent human approval.
 
 ## fe-pr-review
 
@@ -166,10 +182,12 @@ skills/qa-demo/                 # canonical skill (npx skills add)
 skills/pr-warden/               # canonical PR Warden pack + adapter
 skills/fe-pr-review/             # frontend review graph + provider-neutral runners
 skills/be-pr-review/             # backend review graph + adversarial synthesis
+skills/review/                   # unified target resolver + FE/BE router
 plugins/qa-demo/                # Claude Code plugin package
 plugins/pr-warden/              # Claude Code plugin package
 plugins/fe-pr-review/            # Claude Code plugin package
 plugins/be-pr-review/            # Claude Code plugin package
+plugins/review/                  # Claude Code unified review plugin
 .claude-plugin/marketplace.json # marketplace catalog
 ```
 
@@ -180,6 +198,7 @@ rm -rf plugins/qa-demo/skills/qa-demo && cp -a skills/qa-demo plugins/qa-demo/sk
 rm -rf plugins/pr-warden/skills/pr-warden && cp -a skills/pr-warden plugins/pr-warden/skills/pr-warden
 rm -rf plugins/fe-pr-review/skills/fe-pr-review && cp -a skills/fe-pr-review plugins/fe-pr-review/skills/fe-pr-review
 rm -rf plugins/be-pr-review/skills/be-pr-review && cp -a skills/be-pr-review plugins/be-pr-review/skills/be-pr-review
+rm -rf plugins/review/skills/review && cp -a skills/review plugins/review/skills/review
 ```
 
 ## Links

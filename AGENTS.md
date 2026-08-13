@@ -39,7 +39,7 @@ Claude Code plugin marketplace:
 /plugin install qa-demo@sdlc
 ```
 
-Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`, `skills/fe-pr-review/`, `skills/be-pr-review/`. Plugin mirrors under `plugins/` (keep in sync after skill edits).
+Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`, `skills/fe-pr-review/`, `skills/be-pr-review/`, `skills/review/`. Plugin mirrors under `plugins/` (keep in sync after skill edits).
 
 ## Repo map
 
@@ -57,4 +57,5 @@ Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`, `skills
 3. For **pr-warden**: preserve the public provider-neutral policy in `skills/pr-warden/scripts/lib/`. Never auto-merge or approve. Code-change automation is PR-source-branch only, trusted paths only, and bounded to three attempts. Keep one skill tree; plugin copies are mirrors, not alternate sources of truth.
 4. For **fe-pr-review**: keep reviewer subprocesses read-only, preserve immutable-head and structured-evidence contracts, and delegate visual proof to `qa-demo`. The graph runner never performs provider mutations.
 5. For **be-pr-review**: preserve immutable-head, read-only graph, adversarial self-disconfirmation, rollout/migration tracing, and revision-bound verification. Keep historical team evidence out of the portable public skill.
-6. Keep project skill installs on **`.agents/skills/`**; use **`.claude`** only for Claude-specific packaging or compatibility links.
+6. For **review**: keep it a thin target resolver and FE/BE router. Preserve dirty-worktree snapshots, one shared `H0`, contract-based classification, and one unified verdict; do not copy the specialist graphs.
+7. Keep project skill installs on **`.agents/skills/`**; use **`.claude`** only for Claude-specific packaging or compatibility links.

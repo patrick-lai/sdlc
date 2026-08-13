@@ -31,7 +31,10 @@
     "accessibility-review",
     "be-pr-review",
     "backend-review",
-    "reliability-review"
+    "reliability-review",
+    "review",
+    "code-review",
+    "full-stack-review"
   ],
   "files": [
     "skills",
