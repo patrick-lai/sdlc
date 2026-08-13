@@ -126,23 +126,30 @@ for (const marker of [
   'report.html',
   'Statlas',
   'every facet',
+  'historical regression probes',
+  'fail-fast',
+  'pre-fix',
 ]) {
   assert.ok(feReview.includes(marker), `fe-pr-review missing public contract: ${marker}`)
 }
 
 const feContracts = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/contracts.md'), 'utf8')
-for (const marker of ['not-run', 'stale', 'candidates.json', 'Runner safety', 'Filesystem safety', 'gateRequirement', 'report.json']) {
+for (const marker of ['not-run', 'stale', 'candidates.json', 'Runner safety', 'Filesystem safety', 'gateRequirement', 'report.json', 'Historical regression evidence', 'pre-fix behavior']) {
   assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing: ${marker}`)
 }
 
 const fePersonas = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/personas.md'), 'utf8')
 const personaIds = ['repository-contract', 'correctness-platform', 'accessibility-ui', 'rollout-gates', 'privacy-security-data', 'product-tests']
 for (const id of personaIds) assert.ok(fePersonas.includes(id), `personas reference missing ${id}`)
+for (const marker of ['Historical regression probes', 'CI-surface parity', 'runtime/service-descriptor substitution', 'dynamic-key boundaries', 'temporal history/cache', 'side-effect liveness', 'test-oracle validity']) {
+  assert.ok(fePersonas.includes(marker), `personas reference missing historical probe marker: ${marker}`)
+}
 
 const feGraph = fs.readFileSync(path.join(root, 'skills/fe-pr-review/scripts/review-graph.mjs'), 'utf8')
 for (const id of personaIds) assert.ok(feGraph.includes(`'${id}'`), `review-graph missing persona ${id}`)
 for (const facet of ['fg-requirement', 'fg-off-path', 'fg-on-path-states', 'fg-persistence-rollback', 'fg-tests', 'fg-cleanup']) assert.ok(feGraph.includes(`'${facet}'`), `review-graph missing gate facet ${facet}`)
-assert.ok(!/^import .* from '(?!node:)/m.test(feGraph), 'review-graph must stay dependency-free')
+for (const facet of ['ci-surface-parity', 'runtime-config-substitution', 'dependency-resolution-risk', 'dynamic-key-boundaries', 'schema-selection-compatibility', 'temporal-history-cache', 'side-effect-liveness', 'test-oracle-validity']) assert.ok(feGraph.includes(`'${facet}'`), `review-graph missing historical probe ${facet}`)
+assert.ok(!/^import .* from '(?!node:|\.)/m.test(feGraph), 'review-graph must stay dependency-free')
 for (const forbidden of [/--dangerously/, /--yolo/, /bypassPermissions/, /https?:\/\/(?!github\.com|example)/]) {
   assert.ok(!forbidden.test(feGraph), `review-graph must not contain ${forbidden}`)
 }

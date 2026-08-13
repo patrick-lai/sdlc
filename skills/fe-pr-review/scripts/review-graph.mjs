@@ -23,6 +23,9 @@ export const PERSONA_FACETS = Object.freeze({
     ['entrypoints-generated', 'Entrypoints, generated files, banned and deprecated APIs'],
     ['ownership-lockfiles', 'Ownership, changesets, manifests, and lock integrity'],
     ['suppressions-tests', 'Suppressions, skipped tests, test placement, and naming'],
+    ['ci-surface-parity', 'PR versus post-merge validation parity, test selection, and environment-specific checks'],
+    ['runtime-config-substitution', 'Build/runtime placeholders, service descriptors, route/domain ownership, config defaults, and startup fail-fast behavior'],
+    ['dependency-resolution-risk', 'Dependency ranges, lock resolution, generated/prebuilt artifacts, runtime compatibility, and performance blast radius'],
   ],
   'correctness-platform': [
     ['state-and-triggers', 'Reachable state transitions and user triggers'],
@@ -30,6 +33,10 @@ export const PERSONA_FACETS = Object.freeze({
     ['ssr-hydration', 'SSR, hydration, and graceful degradation'],
     ['compatibility-deploy-order', 'Client/server/data compatibility and deploy order'],
     ['performance-resilience', 'Rendering, bundle/network cost, bounds, and resilience'],
+    ['dynamic-key-boundaries', 'Dynamic IDs in paths, selectors, queries, and serializers, including null, empty, and special-character inputs'],
+    ['schema-selection-compatibility', 'GraphQL/Relay fields, arguments, generated artifacts, server support, persisted selections, and rollback compatibility'],
+    ['temporal-history-cache', 'Reload, deep-link, history, undo/redo, cache invalidation, memoization, and cross-tab state'],
+    ['side-effect-liveness', 'Exactly-once side effects survive refactors and gate cleanup without deleting still-required behavior'],
   ],
   'accessibility-ui': [
     ['semantics-names', 'Native semantics and accessible names'],
@@ -50,14 +57,14 @@ export const PERSONA_FACETS = Object.freeze({
     ['fg-ssr-client-parity', 'Server/client evaluation and hydration parity'],
     ['fg-persistence-rollback', 'Persisted data, cache/schema compatibility, and rollback safety'],
     ['fg-tests', 'Tests prove both branches and rollback-sensitive behavior'],
-    ['fg-cleanup', 'Cleanup owner, ticket, expiry, and deleted-code obligations'],
+    ['fg-cleanup', 'Cleanup owner, ticket, expiry, and proof that every deleted side effect survives on the retained path'],
   ],
   'privacy-security-data': [
     ['authorization-tenancy', 'Server authorization, tenant scope, and residency'],
     ['telemetry-pii', 'Analytics/logs/traces contain no user content or PII'],
     ['secrets-errors', 'Secrets, headers, requests, and error capture are scrubbed'],
     ['taxonomy-cardinality', 'Telemetry taxonomy, identifiers, and cardinality'],
-    ['integrity-retries', 'Data integrity, idempotency, duplicate work, and retries'],
+    ['integrity-retries', 'Data integrity, retries, and exactly-once behavior across duplicate events, tabs, and sessions'],
   ],
   'product-tests': [
     ['stated-criteria', 'Stated ticket acceptance criteria mapped to code'],
@@ -65,6 +72,7 @@ export const PERSONA_FACETS = Object.freeze({
     ['responsive-themes-content', 'Responsive, dark mode, long content, and large collections'],
     ['parity-adjacent-behavior', 'API/mobile parity, undo, audit, notification, and admin behavior'],
     ['tests-docs-messaging', 'Regression tests, documentation, help, and product messaging'],
+    ['test-oracle-validity', 'Tests fail on the pre-fix behavior and fixtures distinguish dynamic, special, null, and empty inputs'],
   ],
 })
 
@@ -286,22 +294,19 @@ export function validateCandidate(value, expectedPersona) {
 export function enforceSynthesisPolicy(value) {
   const operationalFollowUps = value.operationalFollowUps || []
   const verdictFollowUps = operationalFollowUps.filter((item) => item.affectsVerdict)
-  const blocked = verdictFollowUps.filter((item) => item.verdictImpact === 'blocked')
-  const unverified = verdictFollowUps.filter((item) => item.verdictImpact === 'unverified')
-  const normalized = (item) => ({ title: item.title, summary: item.summary, source: 'operational-follow-up', severity: item.verdictImpact })
-  let verdict = value.verdict
-  if (blocked.length) verdict = 'blocked'
-  else if (unverified.length && verdict === 'passable') verdict = 'unverified'
+  const hasBlockedEvidence = value.blocking.length > 0 || verdictFollowUps.some((item) => item.verdictImpact === 'blocked')
+  const hasUnverifiedEvidence = value.unverified.length > 0 || verdictFollowUps.some((item) => item.verdictImpact === 'unverified')
+  const verdict = hasBlockedEvidence ? 'blocked' : hasUnverifiedEvidence ? 'unverified' : 'passable'
   const rationale = verdict !== value.verdict
-    ? `${value.rationale} Verdict forced to ${verdict} by ${verdictFollowUps.length} operational follow-up(s) marked as affecting the verdict.`
+    ? `${value.rationale} Deterministic evidence policy corrected the verdict from ${value.verdict} to ${verdict}.`
     : value.rationale
-  const blockedFollowUps = blocked.slice(0, 5)
-  const retainedBlocking = value.blocking.slice(0, Math.max(0, 5 - blockedFollowUps.length))
   return {
     ...value,
     operationalFollowUps,
-    blocking: [...retainedBlocking, ...blockedFollowUps.map(normalized)],
-    unverified: [...value.unverified, ...unverified.map(normalized)],
+    // Keep code findings intact. Verdict-affecting policy remains structured
+    // separately so it cannot consume or hide one of the five code-finding slots.
+    blocking: value.blocking,
+    unverified: value.unverified,
     verdict,
     rationale,
   }

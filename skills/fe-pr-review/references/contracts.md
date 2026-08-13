@@ -8,13 +8,17 @@ Every finding requires `title`, `lens`, `file`, a positive changed `line`, reali
 
 Surviving findings are collected into `candidates.json` with their `persona` and `sourceRoute`.
 
+## Historical regression evidence
+
+Coverage must separately report CI-surface parity, runtime/service-descriptor substitution, dependency-resolution risk, dynamic-key boundary grammar, schema-selection compatibility, temporal history/cache behavior, side-effect liveness, and test-oracle validity. A test claim needs a fixture that distinguishes the broken path and would fail against the pre-fix behavior; a post-merge-only infrastructure failure stays a limitation unless the original diff made it review-detectable.
+
 ## Feature-gate trace
 
 The `rollout-gates` result additionally requires `gateRequirement`: `required`, `not-required`, or `unverified`, with rationale, evidence, and discovered gate keys. Coverage must enumerate the full `fg-*` path: requirement; definition/type/owner/default; evaluation context/timing; targeting; exact off path; complete on path; exposure; SSR/client parity; persistence/rollback; tests; and cleanup. A required or potentially required gate with an unverified decision or path prevents a `passable` verdict.
 
 ## Synthesis
 
-The synthesizer returns `{ "blocking": [], "nonBlocking": [], "unverified": [], "operationalFollowUps": [], "verdict", "rationale" }`. Each `operationalFollowUps` item requires `title`, `summary`, `affectsVerdict`, and `verdictImpact` (`none`, `unverified`, or `blocked`). Routine owner checklists, QA tasks, rollout communication, and post-merge archive work use `affectsVerdict: false` plus `verdictImpact: none`. Concrete unresolved correctness/safety evidence or explicit mandatory pre-approval policy uses `affectsVerdict: true`; deterministic validation forces the overall verdict to `blocked` or `unverified` and mirrors the item into the corresponding finding list, regardless of the model-supplied verdict. It deduplicates by root cause, rejects speculation, preserves disconfirming evidence, caps blocking findings at five, and uses inspected evidence only. `verdict` is `blocked`, `passable`, or `unverified`; it is advice, not a provider action.
+The synthesizer returns `{ "blocking": [], "nonBlocking": [], "unverified": [], "operationalFollowUps": [], "verdict", "rationale" }`. Each `operationalFollowUps` item requires `title`, `summary`, `affectsVerdict`, and `verdictImpact` (`none`, `unverified`, or `blocked`). Routine owner checklists, QA tasks, rollout communication, and post-merge archive work use `affectsVerdict: false` plus `verdictImpact: none`. Concrete unresolved correctness/safety evidence or explicit mandatory pre-approval policy uses `affectsVerdict: true`; deterministic validation derives the overall verdict from code findings plus verdict-affecting follow-ups, regardless of the model-supplied verdict. Operational policy remains in its own structured list and never consumes or deletes one of the five code-finding slots. It deduplicates by root cause, rejects speculation, preserves disconfirming evidence, caps blocking findings at five, and uses inspected evidence only. `verdict` is `blocked`, `passable`, or `unverified`; it is advice, not a provider action.
 
 ## QA evidence
 
