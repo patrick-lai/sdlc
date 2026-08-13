@@ -49,6 +49,21 @@ Use `--runner cursor,codex,claude` and `--model <id>` to override routing; both 
 
 Efficient, capable defaults are preferences, not requirements. Cursor model discovery may select an advertised GPT-5.6 Luna or Grok 4.6 tier; when neither is advertised the adapter falls back to the installed CLI's own default rather than naming a model. Never invent a model ID or weaken read-only flags to make a runner work: the builder rejects bypass, dangerous, yolo, no-sandbox, skip-permission, and auto-approve style flags outright.
 
+### 2b. Run historical regression probes
+
+Every review must explicitly test recurring defect shapes that broad “correctness checked” claims miss:
+
+- confirm changed paths receive equivalent pre-merge and post-merge validation, or record the master-only gap;
+- validate runtime placeholders, service descriptors, route/domain ownership, paired rollout/rollback resources, injected defaults, and startup fail-fast behavior;
+- exercise dynamic identifiers through path, selector, query, and serializer grammars with null, empty, dotted, bracketed, and other special values;
+- verify GraphQL/Relay fields, arguments, generated artifacts, server support, persisted selections, and rollback compatibility;
+- inspect dependency ranges and lock resolutions for version-skew, generated/prebuilt drift, runtime compatibility, and performance blast radius;
+- trace reload, deep-link, back/forward, undo/redo, memoization, cache invalidation, and cross-tab state where relevant;
+- prove required side effects remain exactly once after refactors or gate cleanup;
+- require regression tests whose fixtures distinguish the broken behavior and demonstrably fail against the pre-fix path.
+
+Mark a probe `not-applicable` only with concrete evidence. A post-merge-only flake is not automatically a review miss; record it as a validation-surface limitation rather than inventing a code defect.
+
 ### 3. Use `qa-demo` for visual proof
 
 For a visual or mixed frontend PR, **activate and follow the installed `qa-demo` skill** on the same `H0`. It owns boot detection, assertions, axe-core scans, captions, TestReel recording, truthful verdicts, and cleanup. Do not recreate those mechanics here.
