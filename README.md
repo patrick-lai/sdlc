@@ -15,6 +15,7 @@ npx skills add patrick-lai/sdlc
 | **qa-demo** | Open a target repo/PR, boot Storybook or the best available demo surface, prove the feature end-to-end, and record a polished narrated [TestReel](https://github.com/greentfrapp/testreel) video |
 | **pr-warden** | Keep GitHub or Bitbucket PRs healthy with provider-neutral reads, bounded trusted-path repairs, and a permanent **never merge** rule. |
 | **fe-pr-review** | Fan out 3–6 read-only frontend review personas, synthesize their evidence, and fold in a `qa-demo` run without depending on one forge or model vendor. |
+| **be-pr-review** | Fan out 3–6 backend reviewers across contracts, data, reliability, security, performance, tests, and rollout, then adversarially synthesize revision-bound evidence. |
 
 ## Install
 
@@ -34,6 +35,7 @@ Most agents share **one** project install root: **`.agents/skills/`**.
 npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -y
 npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
 npx skills add patrick-lai/sdlc --skill fe-pr-review -a cursor -y
+npx skills add patrick-lai/sdlc --skill be-pr-review -a cursor -y
 # equivalent project root for codex-only auto-detect:
 # npx skills add patrick-lai/sdlc --skill pr-warden -a codex -y
 
@@ -58,6 +60,7 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 /plugin install qa-demo@sdlc
 /plugin install pr-warden@sdlc
 /plugin install fe-pr-review@sdlc
+/plugin install be-pr-review@sdlc
 ```
 
 ## fe-pr-review
@@ -74,6 +77,22 @@ The coordinator works with the authenticated forge integration already available
 node .agents/skills/fe-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main
 node .agents/skills/fe-pr-review/scripts/review-graph.mjs run --repo-root "$PWD" --base origin/main --dry-run
 npm run test:fe-pr-review
+```
+
+## be-pr-review
+
+Use it when a backend PR needs independent API/compatibility, data/migration, concurrency/reliability, security/observability/performance, repository-contract, and tests/rollout reviewers plus an adversarial synthesis pass:
+
+```text
+/be-pr-review review <pull-request-url> and attach revision-bound backend verification
+```
+
+The dependency-free graph runner snapshots one immutable head, chooses 3–6 backend personas from the changed topology, validates evidence for every facet, challenges each candidate against its strongest disconfirming explanation, and fails closed when evidence is stale or incomplete. It explicitly probes mixed-version contracts, partial writes, transaction/retry/idempotency boundaries, cancellation and shutdown, migration sequencing, query/resource bounds, rollout rollback, environment symmetry, observability ownership, and regression-test oracle validity. A fresh unit, integration, API, migration, fault, or load report can be attached with `--verification-report`; its revision must equal `H0`.
+
+```bash
+node .agents/skills/be-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main
+node .agents/skills/be-pr-review/scripts/review-graph.mjs run --repo-root "$PWD" --base origin/main --dry-run
+npm run test:be-pr-review
 ```
 
 ## pr-warden
@@ -102,7 +121,8 @@ Repository checks:
 npm run smoke:install       # temp-project install of all skills
 npm run test:pr-warden      # policy, providers, ledger, trusted paths
 npm run test:skills          # public-safe content + canonical/plugin parity
-npm run test:fe-pr-review    # fan-out routing, schemas, graph, QA handoff
+npm run test:fe-pr-review    # frontend fan-out, schemas, graph, QA handoff
+npm run test:be-pr-review    # backend fan-out, adversarial graph, verification
 npm run smoke:testreel      # fresh captioned qa-demo recording
 ```
 
@@ -145,9 +165,11 @@ node skills/qa-demo/scripts/smoke-testreel.mjs
 skills/qa-demo/                 # canonical skill (npx skills add)
 skills/pr-warden/               # canonical PR Warden pack + adapter
 skills/fe-pr-review/             # frontend review graph + provider-neutral runners
+skills/be-pr-review/             # backend review graph + adversarial synthesis
 plugins/qa-demo/                # Claude Code plugin package
 plugins/pr-warden/              # Claude Code plugin package
 plugins/fe-pr-review/            # Claude Code plugin package
+plugins/be-pr-review/            # Claude Code plugin package
 .claude-plugin/marketplace.json # marketplace catalog
 ```
 
@@ -157,6 +179,7 @@ Canonical skills live under `skills/`. After editing, refresh plugin mirrors:
 rm -rf plugins/qa-demo/skills/qa-demo && cp -a skills/qa-demo plugins/qa-demo/skills/qa-demo
 rm -rf plugins/pr-warden/skills/pr-warden && cp -a skills/pr-warden plugins/pr-warden/skills/pr-warden
 rm -rf plugins/fe-pr-review/skills/fe-pr-review && cp -a skills/fe-pr-review plugins/fe-pr-review/skills/fe-pr-review
+rm -rf plugins/be-pr-review/skills/be-pr-review && cp -a skills/be-pr-review plugins/be-pr-review/skills/be-pr-review
 ```
 
 ## Links

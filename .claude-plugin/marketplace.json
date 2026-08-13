@@ -5,8 +5,8 @@
     "url": "https://github.com/patrick-lai"
   },
   "metadata": {
-    "description": "SDLC agent skills for Claude Code — QA demos, portable PR Warden, and more",
-    "version": "0.3.0",
+    "description": "SDLC agent skills for Claude Code \u2014 QA demos, portable PR Warden, and more",
+    "version": "0.4.0",
     "pluginRoot": "./plugins"
   },
   "plugins": [
@@ -102,6 +102,38 @@
       ],
       "skills": [
         "./skills/fe-pr-review"
+      ]
+    },
+    {
+      "name": "be-pr-review",
+      "source": "./plugins/be-pr-review",
+      "description": "Provider-neutral backend PR review with immutable snapshots, read-only multi-agent fan-out, adversarial synthesis, and revision-bound verification.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Patrick Lai",
+        "url": "https://github.com/patrick-lai"
+      },
+      "repository": "https://github.com/patrick-lai/sdlc",
+      "license": "MIT",
+      "keywords": [
+        "pull-request",
+        "backend",
+        "review",
+        "multi-agent",
+        "reliability",
+        "security",
+        "migrations"
+      ],
+      "category": "productivity",
+      "tags": [
+        "pull-request",
+        "backend",
+        "review",
+        "multi-agent",
+        "reliability"
+      ],
+      "skills": [
+        "./skills/be-pr-review"
       ]
     }
   ]
