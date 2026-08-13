@@ -163,7 +163,7 @@ export function buildRunnerCommand(route, repoRoot, evidenceDir = repoRoot) {
   let spec
   if (route.kind === 'cursor') {
     // Read-only "ask" mode inside the CLI sandbox; the evidence dir is added read-only.
-    const args = ['--print', '--output-format', 'text', '--mode', 'ask', '--sandbox', 'enabled', '--workspace', repoRoot, '--add-dir', evidenceDir]
+    const args = ['--print', '--output-format', 'text', '--mode', 'ask', '--sandbox', 'enabled', '--trust', '--workspace', repoRoot, '--add-dir', evidenceDir]
     if (model && model !== 'auto') args.push('--model', model)
     spec = { command: route.command, args, promptViaStdin: false }
   } else if (route.kind === 'codex') {
@@ -172,7 +172,7 @@ export function buildRunnerCommand(route, repoRoot, evidenceDir = repoRoot) {
     args.push('-')
     spec = { command: route.command, args, promptViaStdin: true }
   } else if (route.kind === 'claude') {
-    const args = ['--print', '--output-format', 'text', '--permission-mode', 'plan', '--tools', 'Read,Glob,Grep', '--add-dir', evidenceDir]
+    const args = ['--print', '--output-format', 'text', '--permission-mode', 'plan', '--tools', 'Read,Glob,Grep', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--add-dir', evidenceDir]
     if (model) args.push('--model', model)
     spec = { command: route.command, args, promptViaStdin: true }
   } else {
@@ -321,6 +321,19 @@ function execute(route, prompt, repoRoot, evidenceDir, timeoutMs = 20 * 60 * 100
   })
 }
 
+export function classifyRunnerFailure(error) {
+  const message = String(error?.message || error)
+  if (/usage limit|spend cap|usage-credits|monthly usage|higher limit/i.test(message)) return 'capacity'
+  if (/keychain|workspace trust required|log out and sign back in|authentication|unauthori[sz]ed|not logged in/i.test(message)) return 'auth'
+  if (/enterprise policy|invalid MCP configuration/i.test(message)) return 'configuration'
+  if (/timed out|ECONNRESET|ENETUNREACH|temporar/i.test(message)) return 'transient'
+  return 'node'
+}
+
+function rotatedRoutes(routes, start) {
+  return routes.map((_, offset) => routes[(start + offset) % routes.length])
+}
+
 async function mapLimit(items, limit, fn) {
   const results = new Array(items.length); let next = 0
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
@@ -425,7 +438,8 @@ export function buildReviewReport({ snapshot, synthesis, qa, nodeResults, select
     '## QA evidence', '',
     `- **Status:** ${qa.status || 'not-run'}`,
     `- **Revision:** ${qa.revision || 'not established'}`,
-    `- **Artifact hash:** ${qa.hash || 'none'}`, '',
+    `- **Artifact hash:** ${qa.hash || 'none'}`,
+    `- **Reason / limitation:** ${qa.reason || qa.error || (qa.status === 'not-run' ? 'QA was not run.' : 'None reported.')}`, '',
     '## Limitations', '',
     ...coverage.filter((row) => row.status === 'unverified').map((row) => `- **${row.persona} / ${row.id}:** ${row.summary} (${row.evidence.join('; ')})`),
   ]
@@ -433,7 +447,7 @@ export function buildReviewReport({ snapshot, synthesis, qa, nodeResults, select
   const markdown = `${lines.join('\n')}\n`
   const rows = coverage.map((row) => `<tr><td>${escapeHtml(row.persona)}</td><td>${escapeHtml(row.id)}</td><td><strong>${escapeHtml(row.status)}</strong></td><td>${escapeHtml(row.summary)}</td><td>${escapeHtml(row.evidence.join('; '))}</td></tr>`).join('')
   const gateRows = coverage.filter((row) => row.persona === 'rollout-gates').map((row) => `<tr><td>${escapeHtml(row.id)}</td><td><strong>${escapeHtml(row.status)}</strong></td><td>${escapeHtml(row.summary)}</td><td>${escapeHtml(row.evidence.join('; '))}</td></tr>`).join('')
-  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Frontend PR Review Evidence</title><style>body{font:15px/1.5 system-ui;margin:2rem;max-width:1200px}table{border-collapse:collapse;width:100%;margin-bottom:2rem}th,td{border:1px solid #c7c7c7;padding:.55rem;text-align:left;vertical-align:top}th{background:#f3f4f6}code{overflow-wrap:anywhere}.unverified{color:#8a4b00}</style><h1>Frontend PR Review Evidence</h1><ul><li><strong>Head:</strong> <code>${escapeHtml(snapshot.h0)}</code></li><li><strong>Verdict:</strong> ${escapeHtml(synthesis?.verdict || 'unverified')}</li><li><strong>QA:</strong> ${escapeHtml(qa.status || 'not-run')}</li></ul><h2>Feature-gate decision</h2><p><strong>Required:</strong> ${escapeHtml(gate.status)}<br><strong>Gate keys:</strong> ${escapeHtml(gate.keys?.join(', ') || 'none established')}<br><strong>Rationale:</strong> ${escapeHtml(gate.rationale)}<br><strong>Evidence:</strong> ${escapeHtml((gate.evidence || []).join('; '))}</p><h3>Full feature-gate path</h3><table><thead><tr><th>Facet</th><th>Status</th><th>What was established</th><th>Evidence / limitation</th></tr></thead><tbody>${gateRows}</tbody></table><h2>Every review facet</h2><table><thead><tr><th>Reviewer</th><th>Facet</th><th>Status</th><th>What was established</th><th>Evidence / limitation</th></tr></thead><tbody>${rows}</tbody></table><h2>Findings</h2><p>Blocking: ${synthesis?.blocking?.length ?? 0}; non-blocking: ${synthesis?.nonBlocking?.length ?? 0}; unverified: ${synthesis?.unverified?.length ?? 0}.</p><p>${escapeHtml(synthesis?.rationale || 'Synthesis did not complete.')}</p>${findingHtml}</html>`
+  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Frontend PR Review Evidence</title><style>body{font:15px/1.5 system-ui;margin:2rem;max-width:1200px}table{border-collapse:collapse;width:100%;margin-bottom:2rem}th,td{border:1px solid #c7c7c7;padding:.55rem;text-align:left;vertical-align:top}th{background:#f3f4f6}code{overflow-wrap:anywhere}.unverified{color:#8a4b00}</style><h1>Frontend PR Review Evidence</h1><ul><li><strong>Head:</strong> <code>${escapeHtml(snapshot.h0)}</code></li><li><strong>Verdict:</strong> ${escapeHtml(synthesis?.verdict || 'unverified')}</li><li><strong>QA:</strong> ${escapeHtml(qa.status || 'not-run')} — ${escapeHtml(qa.reason || qa.error || (qa.status === 'not-run' ? 'QA was not run.' : 'No limitation reported.'))}</li></ul><h2>Feature-gate decision</h2><p><strong>Required:</strong> ${escapeHtml(gate.status)}<br><strong>Gate keys:</strong> ${escapeHtml(gate.keys?.join(', ') || 'none established')}<br><strong>Rationale:</strong> ${escapeHtml(gate.rationale)}<br><strong>Evidence:</strong> ${escapeHtml((gate.evidence || []).join('; '))}</p><h3>Full feature-gate path</h3><table><thead><tr><th>Facet</th><th>Status</th><th>What was established</th><th>Evidence / limitation</th></tr></thead><tbody>${gateRows}</tbody></table><h2>Every review facet</h2><table><thead><tr><th>Reviewer</th><th>Facet</th><th>Status</th><th>What was established</th><th>Evidence / limitation</th></tr></thead><tbody>${rows}</tbody></table><h2>Findings</h2><p>Blocking: ${synthesis?.blocking?.length ?? 0}; non-blocking: ${synthesis?.nonBlocking?.length ?? 0}; unverified: ${synthesis?.unverified?.length ?? 0}.</p><p>${escapeHtml(synthesis?.rationale || 'Synthesis did not complete.')}</p>${findingHtml}</html>`
   return { version: 1, h0: snapshot.h0, verdict: synthesis?.verdict || 'unverified', featureGate: gate, coverage, qa: { ...qa, content: undefined }, markdown, html }
 }
 
@@ -485,14 +499,41 @@ export async function runGraph(options, injected = {}) {
       return node.status === 'ok' && fs.existsSync(file) ? { ...node, value: JSON.parse(fs.readFileSync(file)) } : node
     })
   } else {
+    const unhealthyRoutes = new Map()
+    const runnerLocks = new Map()
+    const runWithLock = async (route, fn) => {
+      if (route.kind !== 'cursor') return fn()
+      const previous = runnerLocks.get(route.kind) || Promise.resolve()
+      let release
+      const current = new Promise((resolve) => { release = resolve })
+      runnerLocks.set(route.kind, previous.then(() => current))
+      await previous
+      try { return await fn() } finally { release() }
+    }
     nodeResults = await mapLimit(selected, plan.maxWorkers, async (persona, index) => {
-      const route = routes[index % routes.length]
-      try {
-        const raw = await exec(route, reviewerPrompt(persona, created.snapshot, created.runDir), created.snapshot.repoRoot, created.runDir)
-        const value = validateCandidate(extractJson(raw), persona)
-        writeJson(path.join(created.runDir, 'nodes', `${persona}.json`), value)
-        return { persona, route: route.id, model: route.model || null, status: 'ok', findings: value.findings.length, value }
-      } catch (error) { return { persona, route: route.id, model: route.model || null, status: 'failed', error: String(error.message).slice(0, 500) } }
+      const attempts = []
+      for (const route of rotatedRoutes(routes, index % routes.length)) {
+        if (unhealthyRoutes.has(route.id)) {
+          attempts.push({ route: route.id, status: 'skipped', category: unhealthyRoutes.get(route.id) })
+          continue
+        }
+        try {
+          const raw = await runWithLock(route, async () => {
+            if (unhealthyRoutes.has(route.id)) throw new Error(`Runner unavailable after another node failed: ${unhealthyRoutes.get(route.id)}`)
+            return exec(route, reviewerPrompt(persona, created.snapshot, created.runDir), created.snapshot.repoRoot, created.runDir)
+          })
+          const value = validateCandidate(extractJson(raw), persona)
+          writeJson(path.join(created.runDir, 'nodes', `${persona}.json`), value)
+          attempts.push({ route: route.id, status: 'ok' })
+          return { persona, route: route.id, model: route.model || null, status: 'ok', findings: value.findings.length, attempts, value }
+        } catch (error) {
+          const category = classifyRunnerFailure(error)
+          const message = String(error.message).slice(0, 500)
+          attempts.push({ route: route.id, status: 'failed', category, error: message })
+          if (category === 'capacity' || category === 'auth' || category === 'configuration') unhealthyRoutes.set(route.id, category)
+        }
+      }
+      return { persona, route: null, model: null, status: 'failed', error: 'No runner produced valid evidence.', attempts }
     })
     candidates = nodeResults
       .filter((n) => n.status === 'ok')
@@ -501,25 +542,42 @@ export async function runGraph(options, injected = {}) {
   }
   const liveHead = git(created.snapshot.repoRoot, ['rev-parse', created.snapshot.headRef || 'HEAD'])
   if (liveHead !== created.snapshot.h0) throw new Error(`Source head moved from H0 ${created.snapshot.h0} to ${liveHead}; discard this run`)
-  let synthesis = null; let synthesisError = null
-  try {
-    const route = routes[(selected.length) % routes.length]
-    const raw = await exec(route, synthesisPrompt(created.snapshot, candidates, qa), created.snapshot.repoRoot, created.runDir)
-    synthesis = validateSynthesis(extractJson(raw))
-    const failedNodes = nodeResults.filter((node) => node.status === 'failed').length
-    if (failedNodes && synthesis.verdict === 'passable') synthesis = { ...synthesis, verdict: 'unverified', rationale: `${failedNodes} reviewer node(s) failed; ${synthesis.rationale}` }
-    const facetCoverage = buildFacetCoverage(nodeResults, selected)
-    const rolloutResult = nodeResults.find((node) => node.persona === 'rollout-gates' && node.status === 'ok')?.value
-    const gateUnknown = selected.includes('rollout-gates') && rolloutResult?.gateRequirement?.status === 'unverified'
-    if (synthesis.verdict === 'passable' && (facetCoverage.some((row) => row.status === 'unverified') || gateUnknown)) {
-      synthesis = { ...synthesis, verdict: 'unverified', rationale: `One or more review facets, including the feature-gate requirement when applicable, remain unverified; ${synthesis.rationale}` }
+  let synthesis = null; let synthesisError = null; let synthesisRoute = null
+  const synthesisAttempts = []
+  for (const route of rotatedRoutes(routes, selected.length % routes.length)) {
+    try {
+      const raw = await exec(route, synthesisPrompt(created.snapshot, candidates, qa), created.snapshot.repoRoot, created.runDir)
+      synthesis = validateSynthesis(extractJson(raw))
+      synthesisRoute = route.id
+      synthesisAttempts.push({ route: route.id, status: 'ok' })
+      break
+    } catch (error) {
+      synthesisError = String(error.message).slice(0, 1000)
+      synthesisAttempts.push({ route: route.id, status: 'failed', category: classifyRunnerFailure(error), error: synthesisError })
     }
-    // Supplied-but-unusable QA evidence can never round up to a pass.
-    if (synthesis.verdict === 'passable' && (qa.status === 'stale' || (qa.status === 'unverified' && options.qaReport))) {
-      synthesis = { ...synthesis, verdict: 'unverified', rationale: `QA evidence is ${qa.status}; ${synthesis.rationale}` }
+  }
+  const synthesisProducedByRunner = synthesis != null
+  if (!synthesis) {
+    synthesis = {
+      blocking: [],
+      nonBlocking: [],
+      unverified: [{ title: 'Independent synthesis unavailable', summary: 'No configured runner produced a valid synthesis result.' }],
+      verdict: 'unverified',
+      rationale: 'Independent synthesis failed. The report preserves failed nodes and marks every uncovered facet unverified; it must not be treated as a pass.',
     }
-    writeJson(path.join(created.runDir, 'synthesis.json'), synthesis)
-  } catch (error) { synthesisError = error.message }
+  }
+  const failedNodes = nodeResults.filter((node) => node.status === 'failed').length
+  if (failedNodes && synthesis.verdict === 'passable') synthesis = { ...synthesis, verdict: 'unverified', rationale: `${failedNodes} reviewer node(s) failed; ${synthesis.rationale}` }
+  const facetCoverage = buildFacetCoverage(nodeResults, selected)
+  const rolloutResult = nodeResults.find((node) => node.persona === 'rollout-gates' && node.status === 'ok')?.value
+  const gateUnknown = selected.includes('rollout-gates') && rolloutResult?.gateRequirement?.status === 'unverified'
+  if (synthesis.verdict === 'passable' && (facetCoverage.some((row) => row.status === 'unverified') || gateUnknown)) {
+    synthesis = { ...synthesis, verdict: 'unverified', rationale: `One or more review facets, including the feature-gate requirement when applicable, remain unverified; ${synthesis.rationale}` }
+  }
+  if (synthesis.verdict === 'passable' && (qa.status === 'stale' || (qa.status === 'unverified' && options.qaReport))) {
+    synthesis = { ...synthesis, verdict: 'unverified', rationale: `QA evidence is ${qa.status}; ${synthesis.rationale}` }
+  }
+  writeJson(path.join(created.runDir, 'synthesis.json'), synthesis)
   const auditNodes = nodeResults.map(({ value, ...rest }) => rest)
   const audit = {
     version: 1,
@@ -533,12 +591,14 @@ export async function runGraph(options, injected = {}) {
     parseFailures: auditNodes.filter((node) => node.status === 'failed').length,
     candidateCount: candidates.length,
     qa: { ...qa, content: undefined },
-    synthesis: synthesis ? { status: 'ok', verdict: synthesis.verdict } : { status: 'failed', error: synthesisError },
-    status: synthesis ? 'complete' : 'unverified',
-    report: synthesis ? { json: 'report.json', markdown: 'report.md', html: 'report.html' } : null,
+    synthesis: synthesisProducedByRunner
+      ? { status: 'ok', verdict: synthesis.verdict, route: synthesisRoute, attempts: synthesisAttempts }
+      : { status: 'failed', verdict: 'unverified', error: synthesisError, attempts: synthesisAttempts },
+    status: synthesisProducedByRunner ? 'complete' : 'unverified',
+    report: { json: 'report.json', markdown: 'report.md', html: 'report.html' },
   }
   writeJson(path.join(created.runDir, 'audit.json'), audit)
-  const report = synthesis ? writeReviewReport(created.runDir, { snapshot: created.snapshot, synthesis, qa, nodeResults, selected }) : null
+  const report = writeReviewReport(created.runDir, { snapshot: created.snapshot, synthesis, qa, nodeResults, selected })
   return { runDir: created.runDir, plan, audit, synthesis, report }
 }
 

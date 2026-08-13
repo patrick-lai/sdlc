@@ -31,7 +31,7 @@ Only `fresh` is usable evidence. Supplied `stale` or `unverified` QA forces a no
 
 ## Runner safety
 
-Adapters run installed CLIs non-interactively and read-only. `--runner` accepts only `cursor`, `codex`, or `claude`; model IDs use a conservative identifier pattern. Unsafe permission bypass, shell fragments, write modes, and mutation-capable flags are refused. Prompts never run through a shell.
+Adapters run installed CLIs non-interactively and read-only. Cursor uses ask mode, its sandbox, explicit workspace trust, and serialized launches; Claude uses plan mode with inherited MCP configuration disabled; Codex uses an ephemeral read-only sandbox. `--runner` accepts only `cursor`, `codex`, or `claude`; model IDs use a conservative identifier pattern. Unsafe permission bypass, shell fragments, write modes, and mutation-capable flags are refused. Capacity/auth/configuration failures fail over and open a per-run circuit; prompts never run through a shell.
 
 ## Filesystem safety
 

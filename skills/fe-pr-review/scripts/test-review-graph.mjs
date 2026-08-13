@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
-import { PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, clip, discoverRunners, makePlan, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateSynthesis } from './review-graph.mjs'
+import { PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, discoverRunners, makePlan, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateSynthesis } from './review-graph.mjs'
 
 assert.deepEqual(parseArgs(['run', '--max-workers', '3', '--dry-run']), { command: 'run', maxWorkers: '3', dryRun: true })
 assert.deepEqual(selectPersonas(['src/server.ts']), ['repository-contract', 'correctness-platform', 'privacy-security-data'])
@@ -17,8 +17,13 @@ assert.deepEqual(discoverRunners({ available: { cursor: false, codex: true, clau
 assert.equal(discoverRunners({ available: { cursor: true, codex: false, claude: false }, cursorModels: [], model: 'explicit-model' })[0].model, 'explicit-model')
 assert.ok(buildRunnerCommand(routes[0], '/tmp/repo', '/tmp/evidence').args.includes('ask'))
 assert.ok(buildRunnerCommand(routes[0], '/tmp/repo', '/tmp/evidence').args.includes('/tmp/evidence'))
+assert.ok(buildRunnerCommand(routes[0], '/tmp/repo', '/tmp/evidence').args.includes('--trust'))
 assert.ok(buildRunnerCommand(routes[2], '/tmp/repo').args.includes('read-only'))
 assert.ok(buildRunnerCommand(routes[3], '/tmp/repo').args.includes('plan'))
+assert.ok(buildRunnerCommand(routes[3], '/tmp/repo').args.includes('--strict-mcp-config'))
+assert.ok(buildRunnerCommand(routes[3], '/tmp/repo').args.includes('{"mcpServers":{}}'))
+assert.equal(classifyRunnerFailure(new Error('monthly usage limit reached')), 'capacity')
+assert.equal(classifyRunnerFailure(new Error('Workspace Trust Required')), 'auth')
 for (const route of routes) assert.ok(!buildRunnerCommand(route, '/tmp/repo').args.some((arg) => /bypass|danger|yolo|force/.test(arg)))
 assert.throws(() => discoverRunners({ available: { cursor: true, codex: true, claude: true }, runner: 'shell' }), /--runner accepts/)
 assert.throws(() => discoverRunners({ available: { cursor: false, codex: true, claude: false }, model: 'evil; rm -rf /' }), /Unsafe model ID/)
@@ -198,7 +203,16 @@ try {
   const unknownGateRun = await runGraph({ command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'unknown-gate-run') }, { routes: [fakeRoute], execute: executeWithUnknownGate })
   assert.equal(unknownGateRun.synthesis.verdict, 'unverified', 'an unknown feature-gate requirement cannot pass')
   assert.equal(unknownGateRun.report.featureGate.status, 'unverified')
-  const report = buildReviewReport({ snapshot: { h0: head, base: 'base', diffHash: 'hash' }, synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'clear' }, qa: { status: 'not-run' }, selected: ['rollout-gates'], nodeResults: [{ persona: 'rollout-gates', status: 'ok', value: gateCandidate }] })
+  const allFailedDir = path.join(temp, 'all-failed-run')
+  const allFailed = await runGraph({ command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: allFailedDir }, { routes: [fakeRoute], execute: async () => { throw new Error('monthly usage limit reached') } })
+  assert.equal(allFailed.audit.status, 'unverified')
+  assert.equal(allFailed.audit.synthesis.status, 'failed')
+  assert.equal(allFailed.synthesis.verdict, 'unverified')
+  assert.equal(allFailed.report.coverage.length, 37)
+  assert.ok(allFailed.report.coverage.every((row) => row.status === 'unverified'))
+  assert.ok(fs.existsSync(path.join(allFailedDir, 'report.html')), 'failed synthesis must still emit a truthful report')
+  const report = buildReviewReport({ snapshot: { h0: head, base: 'base', diffHash: 'hash' }, synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'clear' }, qa: { status: 'not-run', reason: 'No matching story' }, selected: ['rollout-gates'], nodeResults: [{ persona: 'rollout-gates', status: 'ok', value: gateCandidate }] })
+  assert.ok(report.markdown.includes('No matching story'))
   assert.equal(report.coverage.length, PERSONA_FACETS['rollout-gates'].length)
   assert.ok(report.html.includes('Full feature-gate path'))
   const help = fs.readFileSync(new URL('../SKILL.md', import.meta.url), 'utf8')

@@ -86,7 +86,7 @@ Immediately re-fetch PR state, assignment/approval state when relevant, target t
 
 ## Output
 
-A run directory contains `snapshot/` (`diff.patch`, `changed-files.txt`, `snapshot.json`), `plan.json`, per-persona results under `nodes/`, `candidates.json`, `synthesis.json` when synthesis succeeds, `report.json`, `report.md`, `report.html`, and `audit.json`.
+A run directory contains `snapshot/` (`diff.patch`, `changed-files.txt`, `snapshot.json`), `plan.json`, per-persona results under `nodes/`, `candidates.json`, `synthesis.json`, `report.json`, `report.md`, `report.html`, and `audit.json`. Even when every runner or synthesis route fails, the report is still emitted with every uncovered facet marked `UNVERIFIED`; it is evidence of an incomplete run and must never be published as a pass.
 
 `audit.json` records `h0`, base, diff hash, selected personas, the runner/model behind each node, node status and finding counts, parse failures, QA evidence status, and synthesis status — never credentials or QA report bodies. Report failed nodes and unknown evidence honestly. The coordinating agent decides whether the external result is blocking, non-blocking, passable, or deferred.
 
