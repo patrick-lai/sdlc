@@ -30,6 +30,7 @@ try {
   assert.equal(parsed.link.key.provider, 'github')
   assert.equal(parsed.link.key.number, 2)
   assert.ok(fs.existsSync(path.join(temp, '.agents/skills/qa-demo/scripts/caption-overlay.mjs')))
+  assert.ok(fs.existsSync(path.join(temp, '.agents/skills/qa-demo/scripts/a11y-scan.mjs')))
   console.log(`PASS: installed pr-warden + qa-demo into ${path.join(temp, '.agents/skills')}`)
 } finally {
   fs.rmSync(temp, { recursive: true, force: true })

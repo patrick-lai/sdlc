@@ -99,15 +99,17 @@ The skill will:
 1. Discover how to boot **Storybook → e2e → local app → docs**
 2. Plan a viewer-facing walkthrough (happy path + proof moments)
 3. Inject **on-screen caption overlays** (TestReel has no built-in captions)
-4. Record with TestReel (MP4 if `ffmpeg` is available, else WebM)
-5. Deliver video path + a truthful PASS/PARTIAL/FAIL report, or stop as NOT_APPLICABLE for non-visual changes
+4. Run axe-core on the initial and every major asserted UI state; critical/serious violations block PASS
+5. Record with TestReel (MP4 if `ffmpeg` is available, else WebM)
+6. Deliver video path, `a11y-summary.json`, and a truthful PASS/PARTIAL/FAIL report, or stop as NOT_APPLICABLE for non-visual changes
 
 Helper scripts live under `skills/qa-demo/scripts/`:
 
 | Script | Purpose |
 |--------|---------|
 | `caption-overlay.mjs` | Proof captions (`kicker` / `claim` / `detail`) via Playwright |
-| `smoke-testreel.mjs` | Self-contained narrated smoke against TodoMVC |
+| `a11y-scan.mjs` | Axe-core state scans, deduplication, and critical/serious blocking |
+| `smoke-testreel.mjs` | Self-contained narrated + accessibility smoke against TodoMVC |
 
 ### Validate TestReel locally
 

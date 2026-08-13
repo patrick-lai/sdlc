@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { mergeAccessibilityScans, assertNoBlockingViolations } from '../skills/qa-demo/scripts/a11y-scan.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -63,9 +64,39 @@ for (const marker of [
   'temporary scratch directory',
   'provider CLI/API',
   'tested commit/source revision',
+  'axe-core',
+  'scanAccessibility',
+  'a11y-summary.json',
 ]) {
   assert.ok(qa.includes(marker), `qa-demo missing pressure-test contract: ${marker}`)
 }
+
+const a11ySummary = mergeAccessibilityScans([
+  {
+    violations: [
+      {
+        id: 'button-name',
+        impact: 'critical',
+        storyIds: ['story--one'],
+        nodes: [{ target: ['button'] }],
+      },
+    ],
+  },
+  {
+    violations: [
+      {
+        id: 'button-name',
+        impact: 'critical',
+        storyIds: ['story--two'],
+        nodes: [{ target: ['button.secondary'] }],
+      },
+    ],
+  },
+])
+assert.equal(a11ySummary.scans, 2)
+assert.equal(a11ySummary.violations.length, 1)
+assert.deepEqual(a11ySummary.violations[0].storyIds, ['story--one', 'story--two'])
+assert.throws(() => assertNoBlockingViolations(a11ySummary), /button-name/)
 
 const warden = fs.readFileSync(path.join(root, 'skills/pr-warden/SKILL.md'), 'utf8')
 for (const marker of ['Never merge', '--html', 'GitHub', 'Bitbucket', '3 automatic repair attempts']) {

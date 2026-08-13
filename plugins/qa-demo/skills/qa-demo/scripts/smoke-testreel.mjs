@@ -53,7 +53,7 @@ function resolvePlaywrightId(root) {
 
 function ensureDeps() {
   for (const root of [process.cwd(), __dirname]) {
-    if (!tryResolveFrom(root, 'testreel')) continue
+    if (!tryResolveFrom(root, 'testreel') || !tryResolveFrom(root, 'axe-core')) continue
     const playwrightId = resolvePlaywrightId(root)
     if (playwrightId) return { root, cleanup: false, playwrightId }
   }
@@ -63,9 +63,11 @@ function ensureDeps() {
     requireHere.resolve('testreel')
     try {
       requireHere.resolve('playwright')
+      requireHere.resolve('axe-core')
       return { root: __dirname, cleanup: false, playwrightId: 'playwright' }
     } catch {
       requireHere.resolve('playwright-core')
+      requireHere.resolve('axe-core')
       return { root: __dirname, cleanup: false, playwrightId: 'playwright-core' }
     }
   } catch {
@@ -78,14 +80,14 @@ function ensureDeps() {
     join(scratch, 'package.json'),
     JSON.stringify({ name: 'sdlc-testreel-smoke', private: true, type: 'module' }, null, 2),
   )
-  console.log(`[smoke] Installing testreel + playwright into ${scratch}`)
-  const install = spawnSync('npm', ['install', 'testreel', 'playwright', '--no-fund', '--no-audit'], {
+  console.log(`[smoke] Installing testreel + playwright + axe-core into ${scratch}`)
+  const install = spawnSync('npm', ['install', 'testreel', 'playwright', 'axe-core', '--no-fund', '--no-audit'], {
     cwd: scratch,
     stdio: 'inherit',
     env: process.env,
   })
   if (install.status !== 0) {
-    throw new Error('npm install testreel playwright failed')
+    throw new Error('npm install testreel playwright axe-core failed')
   }
   const pw = spawnSync('npx', ['playwright', 'install', 'chromium'], {
     cwd: scratch,
@@ -113,9 +115,9 @@ async function urlReachable(url) {
 
 async function main() {
   const captionPath = join(__dirname, 'caption-overlay.mjs')
-  if (!existsSync(captionPath)) {
-    throw new Error(`Missing caption helper at ${captionPath}`)
-  }
+  const a11yPath = join(__dirname, 'a11y-scan.mjs')
+  if (!existsSync(captionPath)) throw new Error(`Missing caption helper at ${captionPath}`)
+  if (!existsSync(a11yPath)) throw new Error(`Missing accessibility helper at ${a11yPath}`)
 
   const { root, cleanup, playwrightId } = ensureDeps()
   let browser
@@ -126,6 +128,9 @@ async function main() {
     const { recordPage, hideCursor, showCursor } = loadFrom(root, 'testreel')
     const captions = await import(pathToFileURL(captionPath).href)
     const { showCaption, updateCaption, hideCaption } = captions
+    const { scanAccessibility, mergeAccessibilityScans } = await import(pathToFileURL(a11yPath).href)
+    const axeSource = loadFrom(root, 'axe-core').source
+    const a11yScans = []
 
     let url = process.env.SDLC_SMOKE_URL || DEFAULT_URL
     const useTodoMvc = !process.env.SDLC_SMOKE_URL && (await urlReachable(DEFAULT_URL))
@@ -144,6 +149,7 @@ async function main() {
     mkdirSync(OUT_DIR, { recursive: true })
     browser = await chromium.launch()
     const context = await browser.newContext({
+      bypassCSP: true,
       viewport: { width: 1280, height: 720 },
       recordVideo: {
         dir: OUT_DIR,
@@ -206,6 +212,12 @@ async function main() {
 
       const completed = page.locator('.todo-list li.completed')
       await completed.waitFor({ state: 'visible', timeout: 5000 })
+      a11yScans.push(await scanAccessibility(page, {
+        axeSource,
+        label: 'TodoMVC completed state',
+        storyId: 'smoke--todomvc-completed',
+        exclude: ['#__sdlc_caption'],
+      }))
     } else {
       await updateCaption(page, {
         kicker: 'Fallback',
@@ -217,19 +229,30 @@ async function main() {
       await showCursor(page)
       await page.getByRole('heading', { name: /example domain/i }).waitFor({ state: 'visible' })
       await recorder.screenshot('example-heading')
+      a11yScans.push(await scanAccessibility(page, {
+        axeSource,
+        label: 'Example Domain fallback',
+        storyId: 'smoke--example-domain',
+        exclude: ['#__sdlc_caption'],
+      }))
     }
+
+    const a11ySummary = mergeAccessibilityScans(a11yScans)
+    writeFileSync(join(OUT_DIR, 'a11y-summary.json'), JSON.stringify(a11ySummary, null, 2))
+    console.log(`[smoke] A11y: ${a11ySummary.violations.length} violation rule(s), ${a11ySummary.blockingViolations.length} blocking`)
 
     await showCaption(page, {
       kicker: 'Result',
       claim: 'Caption overlay + TestReel record/stop succeeded',
-      detail: 'Use the Task Board runner for a product-level proof reel',
+      detail: 'Interaction, captions, recording, and axe-core scan executed',
     })
     await hideCursor(page)
     await page.waitForTimeout(1800)
     await hideCaption(page)
 
     const result = await recorder.stop()
-    console.log('[smoke] PASS')
+    const verdict = a11ySummary.blockingViolations.length ? 'PARTIAL' : 'PASS'
+    console.log(`[smoke] ${verdict} — TestReel/captions/axe-core ran; target accessibility decides PASS`)
     console.log(`[smoke] Video: ${result.video}`)
     if (result.screenshots?.length) {
       console.log(`[smoke] Screenshots: ${result.screenshots.join(', ')}`)
