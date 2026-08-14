@@ -61,7 +61,7 @@ Do not implicit-review Q&A, planning, or read-only investigation.
 ## Run
 
 1. Collect a bounded parent brief: 2–4 sentences of what just changed; the **full** changed-file list; and `git diff` (staged + unstaged; if empty, `HEAD~1` only when the user asked to review the last commit). Paste at most ~1500 diff lines (~80k characters). If you truncate, name every omitted file in a `truncated:` list and tell the reviewer those files must be re-read with Read — do not treat the paste as the whole change. Do not paste the full chat.
-2. Spawn **one** reviewer with [references/hosts.md](references/hosts.md). Paste [references/reviewer.md](references/reviewer.md) plus the brief. Mark the pass `in-flight` when edits are still mid-function; otherwise `completed`.
+2. The **parent agent** inspects its currently available native subagent capabilities and chooses one reviewer target. The skill does not name or select the handoff agent or model. Apply the capability and fallback rules in [references/hosts.md](references/hosts.md), then paste [references/reviewer.md](references/reviewer.md) plus the brief. Mark the pass `in-flight` when edits are still mid-function; otherwise `completed`.
 3. If the reply has no `<<<SECOND_OPINION` frame, send one repair turn: return the already-reached conclusion in that frame, or `{"findings":[]}`. Do not review again. If still off-contract, report `FAILED`.
 4. Parse at most five `concern` / `blocker` findings. Empty `findings` is success with nothing to do — do not invent nits.
 

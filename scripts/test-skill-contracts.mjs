@@ -384,8 +384,18 @@ for (const marker of [
 }
 
 const hosts = fs.readFileSync(path.join(root, 'skills/second-opinion/references/hosts.md'), 'utf8')
-for (const marker of ['cursor-agent', 'codex exec', 'permission-mode plan', 'another vendor', 'gpt-5.6-luna', 'haiku']) {
+for (const marker of ['parent agent owns handoff selection', 'Select by capability', 'advertised capabilities', 'report `FAILED`', "another vendor's CLI"]) {
   assert.ok(hosts.includes(marker), `second-opinion hosts missing: ${marker}`)
+}
+assert.match(secondOpinion, /parent agent[\s\S]*chooses one reviewer target/i, 'second-opinion must make the parent choose the handoff target')
+for (const forbidden of [
+  /subagent_type\s*:/i,
+  /model:\s*(?:haiku|sonnet|opus|luna|gpt|codex)/i,
+  /cursor-agent/i,
+  /codex exec/i,
+  /claude --print/i,
+]) {
+  assert.ok(!forbidden.test(`${secondOpinion}\n${hosts}`), `second-opinion skill hardcodes handoff routing: ${forbidden}`)
 }
 
 const agentPath = path.join(root, 'plugins/second-opinion/agents/second-opinion.md')
