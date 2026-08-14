@@ -1,0 +1,12 @@
+{
+  "name": "review-learn",
+  "description": "Learn repository-specific tribal knowledge from either your own or all decided human PR review threads using Leyline or a canonical Markdown fallback.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "repository": "https://github.com/patrick-lai/sdlc",
+  "license": "MIT",
+  "keywords": ["code-review", "pull-request", "learning", "tribal-knowledge", "leyline", "memory"]
+}

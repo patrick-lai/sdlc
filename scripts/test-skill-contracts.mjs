@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { mergeAccessibilityScans, assertNoBlockingViolations } from '../skills/qa-demo/scripts/a11y-scan.mjs'
 import { resolveSmokeMode } from '../skills/qa-demo/scripts/smoke-target.mjs'
@@ -33,6 +35,28 @@ function assertMirror(name) {
 }
 
 for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion']) assertMirror(name)
+
+const reviewLearningVariants = ['review-learn-from-me', 'review-learn-from-all']
+const reviewLearningContractPath = path.join(root, 'templates/review-learn-contract.md')
+const reviewLearningContract = fs.readFileSync(reviewLearningContractPath)
+for (const name of reviewLearningVariants) {
+  const canonical = path.join(root, 'skills', name)
+  const plugin = path.join(root, 'plugins/review-learn/skills', name)
+  const relative = (base) => filesUnder(base).map((file) => path.relative(base, file))
+  assert.deepEqual(relative(plugin), relative(canonical), `${name} plugin file list drifted`)
+  for (const file of relative(canonical)) {
+    assert.deepEqual(
+      fs.readFileSync(path.join(plugin, file)),
+      fs.readFileSync(path.join(canonical, file)),
+      `${name} plugin copy drifted at ${file}`,
+    )
+  }
+  assert.deepEqual(
+    fs.readFileSync(path.join(canonical, 'references/contract.md')),
+    reviewLearningContract,
+    `${name} shared contract drifted; run npm run sync:plugins`,
+  )
+}
 
 const publicRoots = ['README.md', '.claude-plugin', 'skills', 'plugins', 'fixtures']
 const textExtensions = new Set(['.md', '.json', '.mjs', '.js', '.html', '.txt', '.yaml', '.yml'])
@@ -208,7 +232,81 @@ for (const marker of [
   'BLOCKED',
   'UNVERIFIED',
   'Never merge',
+  'leyline_memory_recall',
+  '.agents/review-learnings.md',
+  'review-learning.json',
+  '"schemaVersion": 1',
+  'untrusted historical evidence',
+  'leyline_memory_mark_useful',
 ]) assert.ok(review.includes(marker), `review missing unified routing contract: ${marker}`)
+
+for (const [name, body] of [['fe-pr-review', feReview], ['be-pr-review', beReview]]) {
+  for (const marker of ['leyline_memory_recall', '.agents/review-learnings.md', 'review-learning.json', 'untrusted historical context', 'leyline_memory_mark_useful']) {
+    assert.ok(body.includes(marker), `${name} missing learned-review contract: ${marker}`)
+  }
+}
+
+const reviewLearnContract = reviewLearningContract.toString('utf8')
+for (const marker of [
+  'verified **human reviewer**',
+  'most recent 15 distinct PRs the authenticated operator reviewed',
+  'latest qualifying review event',
+  'never rely on endpoint array order',
+  'page far enough to prove the global top 15',
+  'selection-manifest.json',
+  'Do not backfill older PRs',
+  'Do not use wording heuristics',
+  '### `applied`',
+  '### `rejected`',
+  '### `undecidable`',
+  'provider-recorded final PR source revision',
+  'Patch evolution proves timing and code outcome, but never replaces the independent decision signal',
+  'Status: active|superseded',
+  'leyline_memory_record_review_comment',
+  'Never create duplicate active memories merely to count agreement',
+  'one repo-scoped memory per **distinct collapsed lesson**, not per source thread',
+  'every corroborating reviewer and stable PR/comment ID',
+  'intentionally excludes the mutable resolution',
+  'leyline_memory_remember',
+  'leyline_memory_recall',
+  '.agents/review-learnings.md',
+  'review-learn:v1',
+  'deduplication key',
+  'A zero-lesson result is valid',
+]) assert.ok(reviewLearnContract.includes(marker), `shared review-learning contract missing: ${marker}`)
+
+const reviewLearnFromMe = fs.readFileSync(path.join(root, 'skills/review-learn-from-me/SKILL.md'), 'utf8')
+for (const marker of [
+  'name: review-learn-from-me',
+  '/review-learn-from-me',
+  'currently authenticated user',
+  'If no target is supplied',
+  "shared contract's `recent-15` selection",
+  '15 most recently reviewed PRs',
+  'exactly matches that authenticated provider identity',
+  'Never fall back to “probably me.”',
+  'materialize the complete thread—including all author, reviewer, and other human replies',
+  'Replies supply decision evidence but never become independently learned source comments',
+  'non-matching source comments excluded before candidate-thread expansion',
+  'references/contract.md',
+]) assert.ok(reviewLearnFromMe.includes(marker), `review-learn-from-me missing identity/scale contract: ${marker}`)
+
+const reviewLearnFromAll = fs.readFileSync(path.join(root, 'skills/review-learn-from-all/SKILL.md'), 'utf8')
+for (const marker of [
+  'name: review-learn-from-all',
+  '/review-learn-from-all',
+  'If no target is supplied',
+  "shared contract's `recent-15` selection",
+  '15 most recently reviewed PRs',
+  'all provider-confirmed human reviewers except the PR author',
+  '40 candidate threads per batch',
+  'Do not write the knowledge backend during analysis batches',
+  'Never silently truncate',
+  '`INCOMPLETE`',
+  'same trigger, scope, invariant, review action, and resolution',
+  'do not pick by majority, seniority, or recency alone',
+  'references/contract.md',
+]) assert.ok(reviewLearnFromAll.includes(marker), `review-learn-from-all missing identity/scale contract: ${marker}`)
 
 // Every declared package script must point at a file that exists.
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
@@ -237,6 +335,17 @@ for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'rev
   assert.equal(manifest.name, name)
   assert.equal(manifest.version, entry.version, `${name} plugin/marketplace version drift`)
   assert.ok(fs.existsSync(path.join(root, 'plugins', name, 'skills', name, 'SKILL.md')))
+}
+
+const reviewLearnPlugin = marketplace.plugins.find((plugin) => plugin.name === 'review-learn')
+assert.ok(reviewLearnPlugin, 'marketplace missing plugin review-learn')
+assert.equal(reviewLearnPlugin.source, './plugins/review-learn')
+assert.deepEqual(reviewLearnPlugin.skills, reviewLearningVariants.map((name) => `./skills/${name}`))
+const reviewLearnManifest = JSON.parse(fs.readFileSync(path.join(root, 'plugins/review-learn/.claude-plugin/plugin.json'), 'utf8'))
+assert.equal(reviewLearnManifest.name, 'review-learn')
+assert.equal(reviewLearnManifest.version, reviewLearnPlugin.version, 'review-learn plugin/marketplace version drift')
+for (const name of reviewLearningVariants) {
+  assert.ok(fs.existsSync(path.join(root, 'plugins/review-learn/skills', name, 'SKILL.md')), `review-learn plugin missing ${name}`)
 }
 
 const secondOpinion = fs.readFileSync(path.join(root, 'skills/second-opinion/SKILL.md'), 'utf8')
@@ -288,7 +397,7 @@ assert.ok(agent.includes('model: haiku'), 'Claude agent must stay on haiku')
 assert.ok(fs.existsSync(path.join(root, 'plugins/second-opinion/commands/second-opinion.md')), 'missing /second-opinion command')
 
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8')
-for (const marker of ['fe-pr-review', 'npm run test:fe-pr-review', 'plugins/fe-pr-review', 'be-pr-review', 'npm run test:be-pr-review', 'plugins/be-pr-review', '/review', 'plugins/review']) {
+for (const marker of ['fe-pr-review', 'npm run test:fe-pr-review', 'plugins/fe-pr-review', 'be-pr-review', 'npm run test:be-pr-review', 'plugins/be-pr-review', '/review', 'plugins/review', '/review-learn-from-me', '/review-learn-from-all', 'latest 15 PRs I reviewed; learn only my comments', 'latest 15 PRs I reviewed; learn every human reviewer', 'plugins/review-learn', '.agents/review-learnings.md']) {
   assert.ok(readme.includes(marker), `README missing public skill reference: ${marker}`)
 }
 for (const marker of [
@@ -303,10 +412,58 @@ for (const marker of [
 
 assert.ok(fs.existsSync(path.join(root, 'scripts/sync-plugin-mirrors.mjs')), 'missing sync-plugin-mirrors.mjs')
 assert.ok(pkg.scripts['sync:plugins'], 'package.json missing script sync:plugins')
-const syncSrc = fs.readFileSync(path.join(root, 'scripts/sync-plugin-mirrors.mjs'), 'utf8')
-assert.ok(
-  /existsSync\(src\)[\s\S]*rmSync\(dest/.test(syncSrc),
-  'sync-plugin-mirrors must verify the canonical skill exists before deleting the plugin mirror',
+const syncScriptPath = path.join(root, 'scripts/sync-plugin-mirrors.mjs')
+const syncSrc = fs.readFileSync(syncScriptPath, 'utf8')
+const firstSyncMutation = Math.min(
+  ...['fs.mkdirSync(', 'fs.copyFileSync(', 'fs.rmSync(', 'fs.cpSync(', 'fs.writeFileSync(']
+    .map((marker) => syncSrc.indexOf(marker))
+    .filter((index) => index >= 0),
 )
+for (const marker of [
+  "requireFile(reviewLearningContract, 'canonical review-learning contract')",
+  "requireDirectory(canonical, `canonical review-learning variant ${name}`)",
+  "requireFile(path.join(canonical, 'SKILL.md'), `canonical review-learning variant SKILL.md ${name}`)",
+]) {
+  const preflightIndex = syncSrc.indexOf(marker)
+  assert.ok(preflightIndex >= 0 && preflightIndex < firstSyncMutation, `sync preflight must precede every mutation: ${marker}`)
+}
+
+const syncFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-sync-preflight-'))
+try {
+  const write = (relative, body = '') => {
+    const file = path.join(syncFixture, relative)
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, body)
+  }
+  write('scripts/sync-plugin-mirrors.mjs', syncSrc)
+  write('templates/review-learn-contract.md', '# contract\n')
+  for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion']) {
+    write(`skills/${name}/SKILL.md`, `# ${name}\n`)
+  }
+  write('skills/review-learn-from-me/SKILL.md', '# from me\n')
+  fs.mkdirSync(path.join(syncFixture, 'skills/review-learn-from-all'), { recursive: true })
+  write('skills/second-opinion/references/reviewer.md', '# reviewer\n')
+  write('plugins/second-opinion/agents/second-opinion.md', '---\nname: second-opinion\n---\n# old\n')
+  write('plugins/review-learn/skills/sentinel.txt', 'preserve me\n')
+
+  const failedSync = spawnSync(process.execPath, [path.join(syncFixture, 'scripts/sync-plugin-mirrors.mjs')], {
+    cwd: syncFixture,
+    encoding: 'utf8',
+  })
+  assert.notEqual(failedSync.status, 0, 'sync must fail when a canonical review-learning SKILL.md is missing')
+  assert.match(`${failedSync.stdout}\n${failedSync.stderr}`, /canonical review-learning variant SKILL\.md review-learn-from-all missing/)
+  assert.equal(
+    fs.readFileSync(path.join(syncFixture, 'plugins/review-learn/skills/sentinel.txt'), 'utf8'),
+    'preserve me\n',
+    'failed sync must leave the existing plugin mirror untouched',
+  )
+  assert.equal(
+    fs.existsSync(path.join(syncFixture, 'skills/review-learn-from-me/references/contract.md')),
+    false,
+    'failed sync must not generate canonical references before preflight completes',
+  )
+} finally {
+  fs.rmSync(syncFixture, { recursive: true, force: true })
+}
 
 console.log('PASS: public skill contracts, mirrors, packaging, and internal-leak guard')

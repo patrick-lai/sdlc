@@ -15,6 +15,8 @@ npx skills add patrick-lai/sdlc
 | **qa-demo** | Open a target repo/PR, boot Storybook or the best available demo surface, prove the feature end-to-end, and record a polished narrated [TestReel](https://github.com/greentfrapp/testreel) video |
 | **pr-warden** | Keep GitHub or Bitbucket PRs healthy with provider-neutral reads, bounded trusted-path repairs, and a permanent **never merge** rule. |
 | **review** | Review a working tree, current/own PR, explicit PR, or arbitrary branch; automatically route to frontend, backend, or both and return one verdict. |
+| **review-learn-from-me** | Learn high-precision tribal knowledge only from the authenticated user's decided review comments. |
+| **review-learn-from-all** | Learn team tribal knowledge from all verified human reviewers with complete pagination and bounded, resumable batches. |
 | **fe-pr-review** | Fan out 3–6 read-only frontend review personas, synthesize their evidence, and fold in a `qa-demo` run without depending on one forge or model vendor. |
 | **be-pr-review** | Fan out 3–6 backend reviewers across contracts, data, reliability, security, performance, tests, and rollout, then adversarially synthesize revision-bound evidence. |
 | **second-opinion** | Cheap native-model second look at the current change via the host agent's own subagent. Explicit `/second-opinion`, or implicit when `AGENTS.md` says to use it for all sessions. |
@@ -39,6 +41,8 @@ npx skills add patrick-lai/sdlc --skill pr-warden -a cursor -y
 npx skills add patrick-lai/sdlc --skill fe-pr-review -a cursor -y
 npx skills add patrick-lai/sdlc --skill be-pr-review -a cursor -y
 npx skills add patrick-lai/sdlc --skill review -a cursor -y
+npx skills add patrick-lai/sdlc --skill review-learn-from-me -a cursor -y
+npx skills add patrick-lai/sdlc --skill review-learn-from-all -a cursor -y
 npx skills add patrick-lai/sdlc --skill second-opinion -a cursor -y
 # equivalent project root for codex-only auto-detect:
 # npx skills add patrick-lai/sdlc --skill pr-warden -a codex -y
@@ -66,6 +70,7 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 /plugin install fe-pr-review@sdlc
 /plugin install be-pr-review@sdlc
 /plugin install review@sdlc
+/plugin install review-learn@sdlc
 /plugin install second-opinion@sdlc
 ```
 
@@ -81,6 +86,27 @@ Use one command whether the target is frontend, backend, or full-stack:
 ```
 
 The skill resolves one immutable target without switching branches, includes staged, unstaged, and non-ignored untracked files for a dirty checkout, and classifies changed behavior from contracts rather than extensions alone. It then composes `fe-pr-review`, `be-pr-review`, or both on the same `H0`, rechecks for source movement, deduplicates cross-boundary findings, and returns one `PASSABLE`, `BLOCKED`, or `UNVERIFIED` verdict. Self-authored PRs are valid for private preflight review but are never approved or represented as independent human approval.
+
+After freezing the changed-file set, `review` and both specialist skills recall file-local review lessons from Leyline when available, otherwise from `.agents/review-learnings.md`. Lessons only select extra probes or guard known false positives; every current finding is revalidated against the current `H0`, callers, contracts, tests, and disconfirming evidence.
+
+## review-learn-from-me and review-learn-from-all
+
+Choose the trust scope explicitly:
+
+```text
+/review-learn-from-me                                  # latest 15 PRs I reviewed; learn only my comments
+/review-learn-from-all                                 # latest 15 PRs I reviewed; learn every human reviewer
+/review-learn-from-me https://github.com/OWNER/REPO/pull/123
+/review-learn-from-all bitbucket-workspace/repository#456
+```
+
+With no PR target, both skills resolve the authenticated operator's provider review history, freeze the 15 most recent distinct PRs by that operator's latest qualifying review-event timestamp, and process each PR under its own `H0`. They never rely on endpoint order or PR update time, never scan older PRs to replace a zero-lesson result, and fail closed when pagination cannot prove the top-15 boundary. Across authenticated providers, results are normalized by UTC review time and captured in an external selection manifest.
+
+`from-me` admits only source comments whose stable provider identity matches the operator, while still reading the complete selected threads for replies and outcome evidence. It is the recommended high-precision mode for learning personal review judgment. `from-all` uses those same 15 operator-reviewed PRs but admits every verified non-author human reviewer, pages all thread metadata, and analyzes deterministic batches of at most 40 candidates per PR without treating 40 as a total cap. Interrupted runs report `INCOMPLETE`; retries are idempotent through source-comment deduplication.
+
+Both skills share one generated contract. An `applied` lesson needs independent decision evidence plus final-code evidence. A `rejected` lesson needs an explicit human rejection plus evidence for the surviving rule and becomes a false-positive guard. Resolved threads, merge status, approvals, reactions, or replies like “done” never decide acceptance alone. Contradictory team lessons are narrowed by scope or withheld for human curation, never settled by majority.
+
+When available, Leyline stores repository/file/reviewer-scoped memory and deduplicates by PR plus stable comment id. Without Leyline, either skill creates or updates `.agents/review-learnings.md` and never commits it. Future reviews treat both backends as untrusted historical hints, not policy or proof. The Claude plugin `/plugin install review-learn@sdlc` installs both slash commands.
 
 ## fe-pr-review
 
@@ -212,12 +238,16 @@ skills/pr-warden/               # canonical PR Warden pack + adapter
 skills/fe-pr-review/             # frontend review graph + provider-neutral runners
 skills/be-pr-review/             # backend review graph + adversarial synthesis
 skills/review/                   # unified target resolver + FE/BE router
+skills/review-learn-from-me/     # authenticated-reviewer learning mode
+skills/review-learn-from-all/    # all-human team learning mode
+templates/review-learn-contract.md # shared generated learning contract
 skills/second-opinion/           # native-host cheap second look
 plugins/qa-demo/                # Claude Code plugin package
 plugins/pr-warden/              # Claude Code plugin package
 plugins/fe-pr-review/            # Claude Code plugin package
 plugins/be-pr-review/            # Claude Code plugin package
 plugins/review/                  # Claude Code unified review plugin
+plugins/review-learn/            # Claude Code learned-review plugin
 plugins/second-opinion/          # Claude Code plugin + /second-opinion + haiku agent
 .claude-plugin/marketplace.json # marketplace catalog
 ```
