@@ -13,7 +13,7 @@ assert.deepEqual(selectPersonas(['src/Button.tsx']), ['repository-contract', 'co
 assert.throws(() => selectPersonas([], 'accessibility-ui'), /3-6/)
 for (const facet of ['ci-surface-parity', 'runtime-config-substitution', 'dependency-resolution-risk', 'dynamic-key-boundaries', 'schema-selection-compatibility', 'temporal-history-cache', 'side-effect-liveness', 'test-oracle-validity']) assert.ok(Object.values(PERSONA_FACETS).flat().some(([id]) => id === facet), `missing historical probe ${facet}`)
 assert.equal(Object.values(PERSONA_FACETS).flat().length, 45, 'facet catalogue must stay at 45 probes')
-assert.ok(PERSONA_FACETS['rollout-gates'].some(([id, label]) => id === 'fg-cleanup' && /deleted side effect survives/.test(label)), 'fg-cleanup must require tracing deleted side effects into a surviving path')
+assert.ok(PERSONA_FACETS['rollout-gates'].some(([id, label]) => id === 'fg-cleanup' && /does not preserve controls confined to the discarded branch/.test(label)), 'fg-cleanup must not require losing-branch-only controls on the winning path')
 assert.ok(PERSONA_FACETS['privacy-security-data'].some(([id, label]) => id === 'integrity-retries' && /exactly-once/.test(label) && /sessions/.test(label)), 'integrity-retries must cover exactly-once behavior across tabs and sessions')
 
 const routes = discoverRunners({ available: { cursor: true, codex: true, claude: true }, cursorModels: ['gpt-5.6-luna-high', 'cursor-grok-4.6-medium'] })
@@ -201,6 +201,9 @@ try {
   assert.ok(withFindings.audit.nodes.every((node) => node.findings === 1))
   assert.ok(seenPrompts.some((p) => p.includes('Button.tsx')), 'reviewer prompts must carry the immutable diff')
   assert.ok(seenPrompts.every((p) => p.includes('untrusted')), 'every prompt carries the untrusted-input warning')
+  assert.ok(seenPrompts.every((p) => p.includes('FEATURE-GATE CLEANUP FALSE-POSITIVE GUARD')), 'every reviewer and synthesizer must receive the cleanup guard')
+  assert.ok(seenPrompts.every((p) => p.includes('hypothetical, not a reachable trigger')), 'cleanup reviews must reject hypothetical still-off cohorts')
+  assert.ok(seenPrompts.every((p) => p.includes('nested gate or side effect used only by the losing branch is retired with that branch')), 'cleanup reviews must not preserve losing-branch-only controls')
   for (const probe of ['ci-surface-parity', 'runtime-config-substitution', 'dependency-resolution-risk', 'dynamic-key-boundaries', 'schema-selection-compatibility', 'temporal-history-cache', 'side-effect-liveness', 'test-oracle-validity']) {
     assert.ok(seenPrompts.some((prompt) => prompt.includes(`\"id\":\"${probe}\"`)), `review prompts missing historical probe ${probe}`)
   }

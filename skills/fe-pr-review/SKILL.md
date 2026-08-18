@@ -67,7 +67,7 @@ Every review must explicitly test recurring defect shapes that broad “correctn
 - verify GraphQL/Relay fields, arguments, generated artifacts, server support, persisted selections, and rollback compatibility;
 - inspect dependency ranges and lock resolutions for version-skew, generated/prebuilt drift, runtime compatibility, and performance blast radius;
 - trace reload, deep-link, back/forward, undo/redo, memoization, cache invalidation, and cross-tab state where relevant;
-- prove required side effects remain exactly once after refactors or gate cleanup;
+- prove side effects required by the retained branch remain exactly once after refactors or gate cleanup;
 - require regression tests whose fixtures distinguish the broken behavior and demonstrably fail against the pre-fix path.
 
 Mark a probe `not-applicable` only with concrete evidence. A post-merge-only flake is not automatically a review miss; record it as a validation-surface limitation rather than inventing a code defect.
@@ -92,6 +92,12 @@ No report means QA was not run (`not-run`). A report for another revision is `st
 ### 3b. Require the full feature-gate path
 
 For every frontend behavior change, the rollout reviewer first decides `required`, `not-required`, or `unverified` and cites concrete evidence. A vague “feature gates checked” statement is invalid. When a gate is required, trace each step separately: definition/key/type/owner/default; evaluation layer, identity context, and timing; targeting; exact gate-off behavior; complete gate-on states; exposure; SSR/client parity; persisted-data and rollback compatibility; both-branch tests; and cleanup owner/ticket/expiry. Any required path facet that is missing or unverified prevents a pass.
+
+#### Feature-gate cleanup false-positive guard
+
+A PR explicitly framed as feature-gate cleanup represents the rollout decision: it removes the target gate and selects the winning branch. Unless repository policy explicitly requires a rollout artifact in the PR, or the snapshot contains concrete evidence that rollout is incomplete, do not downgrade the review because external targeting state is absent. Compare the post-cleanup code with the pre-cleanup winning branch. Differences found only by comparing against the intentionally discarded branch are expected cleanup, not defects.
+
+An evaluation or side effect nested exclusively inside the discarded branch is not an independent live gate after the outer branch is retired. Require it on the retained path only when that path already evaluated it, an explicit contract requires the behavior, or concrete evidence disproves the cleanup premise. “Some cohort might still receive the losing value” is hypothetical, not a reachable trigger. If useful, request rollout confirmation as a non-blocking operational follow-up; do not turn that assumption into a code finding or an `UNVERIFIED` verdict.
 
 ### 3c. Publish a clear report when requested
 
