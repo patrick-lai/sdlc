@@ -4,7 +4,7 @@
 
 Each reviewer returns JSON: `{ "persona": "...", "coverage": [...], "findings": [...] }`. `coverage` contains every facet assigned to that persona in declared order. Every row requires `id`, `status`, a concrete `summary`, and non-empty `evidence`. Status is `checked`, `finding`, `not-applicable`, or `unverified`; vague pass claims and omitted facets are invalid.
 
-Every finding requires `title`, `lens`, `file`, a positive changed `line`, realistic `trigger`, an `executionPath` of at least two steps, `violatedContract`, material `impact`, concrete `evidence`, `severity`, numeric `confidence`, `disconfirmingReason`, `suggestedFix`, and focused `verification`. Empty findings are valid. Malformed output fails the node and caps synthesis at `unverified`.
+Every finding requires `title`, `lens`, `file`, a positive changed `line`, realistic `trigger`, an `executionPath` of at least two steps, a concrete `reproduction`, `rootCause` at the first changed behavior that violates the contract, `violatedContract`, material `impact`, concrete `evidence`, `severity`, numeric `confidence`, `disconfirmingReason`, `suggestedFix`, a minimal code-level `suggestedPatch` (or clearly labelled pseudocode when exact syntax cannot be established), and focused `verification`. Empty findings are valid. Malformed output fails the node and caps synthesis at `unverified`.
 
 Surviving findings are collected into `candidates.json` with their `persona` and `sourceRoute`.
 

@@ -163,6 +163,7 @@ const feContracts = fs.readFileSync(path.join(root, 'skills/fe-pr-review/referen
 for (const marker of ['not-run', 'stale', 'opt-in', 'does not change the code verdict', 'candidates.json', 'Runner safety', 'Filesystem safety', 'gateRequirement', 'report.json', 'Historical regression evidence', 'pre-fix behavior']) {
   assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing: ${marker}`)
 }
+for (const marker of ['reproduction', 'rootCause', 'suggestedPatch']) assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing publishable finding field: ${marker}`)
 
 const fePersonas = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/personas.md'), 'utf8')
 const personaIds = ['repository-contract', 'correctness-platform', 'accessibility-ui', 'rollout-gates', 'privacy-security-data', 'product-tests']
@@ -204,6 +205,7 @@ const beEvaluation = fs.readFileSync(path.join(root, 'skills/be-pr-review/refere
 for (const marker of ['train/validation/holdout', 'recurring in at least three independent PRs', 'Negative controls', 'read-check-write races', 'derived-value consistency']) assert.ok(beEvaluation.includes(marker), `be-pr-review evaluation missing ${marker}`)
 const beContracts = fs.readFileSync(path.join(root, 'skills/be-pr-review/references/contracts.md'), 'utf8')
 for (const marker of ['read-check-write atomicity', 'fail-soft fallbacks', 'derived-value consistency', 'explicit verification obligations']) assert.ok(beContracts.includes(marker), `be-pr-review contracts missing ${marker}`)
+for (const marker of ['reproduction', 'rootCause', 'suggestedPatch']) assert.ok(beContracts.includes(marker), `be-pr-review contracts missing publishable finding field: ${marker}`)
 
 const bePersonas = fs.readFileSync(path.join(root, 'skills/be-pr-review/references/personas.md'), 'utf8')
 const bePersonaIds = ['repository-contract', 'api-compatibility', 'data-migrations', 'concurrency-reliability', 'security-observability-performance', 'tests-rollout']
@@ -244,6 +246,11 @@ for (const marker of [
   'explicitly requests',
   'not-run',
 ]) assert.ok(review.includes(marker), `review missing unified routing contract: ${marker}`)
+
+const blockerComment = fs.readFileSync(path.join(root, 'skills/review/references/blocking-pr-comment.md'), 'utf8')
+for (const marker of ['### 🔴 Blocker:', '#### 🧪 How to reproduce', '#### 🔎 Root cause', '#### 🛠 Suggested fix', '#### ✅ Focused verification', 'sdlc-review:blocker', 'fingerprint']) {
+  assert.ok(blockerComment.includes(marker), `blocking PR comment format missing ${marker}`)
+}
 
 for (const [name, body] of [['fe-pr-review', feReview], ['be-pr-review', beReview]]) {
   for (const marker of ['leyline_memory_recall', '.agents/review-learnings.md', 'review-learning.json', 'untrusted historical context', 'leyline_memory_mark_useful']) {

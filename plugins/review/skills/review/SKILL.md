@@ -19,7 +19,7 @@ Resolve one review target, freeze it, classify its actual contracts, and delegat
 - Reviewers and synthesizers are read-only. They never stage, stash, checkout, reset, commit, push, comment, approve, resolve, merge, deploy, migrate, install, or change traffic.
 - A self-authored PR is valid for private preflight review, but never approve it or represent the result as independent human approval.
 - Missing, stale, truncated, conflicting, or secret-redacted code/safety evidence is `UNVERIFIED`, never a pass. Keep routine operational follow-ups separate from the code verdict.
-- Provider mutations are outside the review graph and occur only when explicitly requested, after a fresh state and `H0` check. Never merge.
+- Provider mutations are outside the review graph and occur only when explicitly requested, after a fresh state and `H0` check. Never merge. An explicit request to publish blocker comments permits only the verified inline blocker comments described in [`references/blocking-pr-comment.md`](references/blocking-pr-comment.md).
 
 ## 1. Resolve the target without asking when it is safe
 
@@ -124,11 +124,15 @@ Return one concise report containing:
 - base and source plus immutable `H0`;
 - route: frontend, backend, or both, with classification evidence;
 - code verdict;
-- blocking findings first, each with exact path/line, trigger, execution path, violated invariant, impact, evidence, confidence, disconfirming reason, smallest fix, and focused verification;
+- blocking findings first, each with exact path/line, trigger, reproducible steps, execution path, root cause, violated invariant, impact, evidence, confidence, disconfirming reason, smallest fix, code-level patch or labelled pseudocode, and focused verification;
 - non-blocking note when useful;
 - frontend QA status (`not-run` unless the user opted into qa-demo) and backend verification status when applicable;
 - failed nodes and explicit limitations;
 - learned-knowledge backend and only the lesson IDs that materially changed a probe or conclusion, never raw comments;
 - operational follow-ups, separate from the code verdict.
 
-If no blocking findings exist, say so explicitly. Never post an unrequested generic PR comment. If publication or a provider comment is explicitly requested, emit exactly one idempotent summary for `H0` after rechecking live state, checks, assignment/approval state when relevant, threads, and source identity.
+If no blocking findings exist, say so explicitly. Never post an unrequested generic PR comment.
+
+### Blocking PR comments
+
+When the user explicitly asks the review to publish or comment on blockers for a PR, publish one inline comment for each verified blocking root cause after a fresh state, `H0`, changed-line, and thread check. Use the exact structure in [`references/blocking-pr-comment.md`](references/blocking-pr-comment.md): reproduction, root cause, impact, smallest code fix with a code-level patch, and pre-fix-failing focused verification. Post no generic top-level blocker summary, no comment for `UNVERIFIED` or non-blocking items, and no duplicate comment for the same `H0` marker/fingerprint. A requested general report summary remains separate and must link to the artifact rather than repeat inline blocker content.
