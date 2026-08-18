@@ -1,6 +1,6 @@
 {
   "name": "fe-pr-review",
-  "description": "Provider-neutral frontend PR review with read-only multi-agent fan-out, synthesis, and qa-demo evidence.",
+  "description": "Provider-neutral frontend PR review with read-only multi-agent fan-out and synthesis. qa-demo visual proof is opt-in.",
   "version": "0.1.0",
   "author": {
     "name": "Patrick Lai",

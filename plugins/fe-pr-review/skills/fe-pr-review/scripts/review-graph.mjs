@@ -326,7 +326,9 @@ export function validateSynthesis(value) {
   return enforceSynthesisPolicy({ ...value, operationalFollowUps })
 }
 
-export function makePlan(snapshot, selected, routes, maxWorkers = 4) {
+export function makePlan(snapshot, selected, routes, maxWorkers = 4, includeQa = false) {
+  const synthesisDependsOn = selected.map((id) => `review:${id}`)
+  if (includeQa) synthesisDependsOn.push('qa-demo')
   return {
     version: 1,
     h0: snapshot.h0,
@@ -336,7 +338,7 @@ export function makePlan(snapshot, selected, routes, maxWorkers = 4) {
     maxWorkers: Math.max(1, Math.min(Number(maxWorkers) || 4, 6)),
     routes: selected.map((persona, index) => ({ persona, route: routes[index % Math.max(routes.length, 1)]?.id || null })),
     qa: { status: 'not-run' },
-    graph: [...selected.map((id) => ({ id: `review:${id}`, dependsOn: [] })), { id: 'synthesis', dependsOn: selected.map((id) => `review:${id}`).concat('qa-demo') }],
+    graph: [...selected.map((id) => ({ id: `review:${id}`, dependsOn: [] })), { id: 'synthesis', dependsOn: synthesisDependsOn }],
   }
 }
 
@@ -447,7 +449,7 @@ export async function runGraph(options, injected = {}) {
   const priorPlan = created.selected ? null : JSON.parse(fs.readFileSync(path.join(created.runDir, 'plan.json')))
   const selected = created.selected || priorPlan.personas
   const routes = injected.routes || discoverRunners(options)
-  const plan = makePlan(created.snapshot, selected, routes, options.maxWorkers || priorPlan?.maxWorkers)
+  const plan = makePlan(created.snapshot, selected, routes, options.maxWorkers || priorPlan?.maxWorkers, Boolean(options.qaReport))
   const qa = qaEvidence(options.qaReport, created.snapshot.h0)
   plan.qa = { ...qa, content: undefined }
   writeJson(path.join(created.runDir, 'plan.json'), plan)
@@ -596,7 +598,7 @@ Usage:
 Notes:
   plan always behaves as a dry run and launches no model.
   --output must be outside the reviewed repository.
-  --qa-report takes a fresh report produced separately by the qa-demo skill.`)
+  --qa-report is opt-in: a fresh report produced separately by the qa-demo skill. Omit it to leave QA as not-run.`)
 }
 
 async function main() {

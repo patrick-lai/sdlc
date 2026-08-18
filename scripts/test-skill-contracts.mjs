@@ -138,6 +138,8 @@ for (const marker of ['Never merge', '--html', 'GitHub', 'Bitbucket', '3 automat
 const feReview = fs.readFileSync(path.join(root, 'skills/fe-pr-review/SKILL.md'), 'utf8')
 for (const marker of [
   'qa-demo',
+  'opt-in',
+  'explicitly requests',
   'H0',
   'UNVERIFIED',
   'Agent agreement is not proof',
@@ -158,7 +160,7 @@ for (const marker of [
 }
 
 const feContracts = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/contracts.md'), 'utf8')
-for (const marker of ['not-run', 'stale', 'candidates.json', 'Runner safety', 'Filesystem safety', 'gateRequirement', 'report.json', 'Historical regression evidence', 'pre-fix behavior']) {
+for (const marker of ['not-run', 'stale', 'opt-in', 'does not change the code verdict', 'candidates.json', 'Runner safety', 'Filesystem safety', 'gateRequirement', 'report.json', 'Historical regression evidence', 'pre-fix behavior']) {
   assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing: ${marker}`)
 }
 
@@ -238,6 +240,9 @@ for (const marker of [
   '"schemaVersion": 1',
   'untrusted historical evidence',
   'leyline_memory_mark_useful',
+  'opt-in',
+  'explicitly requests',
+  'not-run',
 ]) assert.ok(review.includes(marker), `review missing unified routing contract: ${marker}`)
 
 for (const [name, body] of [['fe-pr-review', feReview], ['be-pr-review', beReview]]) {
@@ -407,7 +412,7 @@ assert.ok(agent.includes('model: haiku'), 'Claude agent must stay on haiku')
 assert.ok(fs.existsSync(path.join(root, 'plugins/second-opinion/commands/second-opinion.md')), 'missing /second-opinion command')
 
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8')
-for (const marker of ['fe-pr-review', 'npm run test:fe-pr-review', 'plugins/fe-pr-review', 'be-pr-review', 'npm run test:be-pr-review', 'plugins/be-pr-review', '/review', 'plugins/review', '/review-learn-from-me', '/review-learn-from-all', 'latest 15 PRs I reviewed; learn only my comments', 'latest 15 PRs I reviewed; learn every human reviewer', 'plugins/review-learn', '.agents/review-learnings.md']) {
+for (const marker of ['fe-pr-review', 'npm run test:fe-pr-review', 'plugins/fe-pr-review', '`qa-demo` is opt-in', 'be-pr-review', 'npm run test:be-pr-review', 'plugins/be-pr-review', '/review', 'plugins/review', '/review-learn-from-me', '/review-learn-from-all', 'latest 15 PRs I reviewed; learn only my comments', 'latest 15 PRs I reviewed; learn every human reviewer', 'plugins/review-learn', '.agents/review-learnings.md']) {
   assert.ok(readme.includes(marker), `README missing public skill reference: ${marker}`)
 }
 for (const marker of [

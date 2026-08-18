@@ -88,7 +88,10 @@ assert.throws(() => validateSynthesis({ blocking: Array(6).fill({}), nonBlocking
 const plan = makePlan({ h0: 'a'.repeat(40), base: 'b'.repeat(40), diffHash: 'c'.repeat(64) }, selectPersonas(['x.tsx']), routes, 99)
 assert.equal(plan.maxWorkers, 6)
 assert.equal(plan.graph.at(-1).id, 'synthesis')
-assert.ok(plan.graph.at(-1).dependsOn.includes('qa-demo'))
+assert.ok(!plan.graph.at(-1).dependsOn.includes('qa-demo'), 'qa-demo is opt-in and must not be a default synthesis dependency')
+assert.equal(plan.qa.status, 'not-run')
+const optedInPlan = makePlan({ h0: 'a'.repeat(40), base: 'b'.repeat(40), diffHash: 'c'.repeat(64) }, selectPersonas(['x.tsx']), routes, 4, true)
+assert.ok(optedInPlan.graph.at(-1).dependsOn.includes('qa-demo'))
 assert.equal(plan.routes.length, 6)
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'fe-pr-review-test-'))

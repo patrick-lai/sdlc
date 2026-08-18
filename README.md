@@ -17,7 +17,7 @@ npx skills add patrick-lai/sdlc
 | **review** | Review a working tree, current/own PR, explicit PR, or arbitrary branch; automatically route to frontend, backend, or both and return one verdict. |
 | **review-learn-from-me** | Learn high-precision tribal knowledge only from the authenticated user's decided review comments. |
 | **review-learn-from-all** | Learn team tribal knowledge from all verified human reviewers with complete pagination and bounded, resumable batches. |
-| **fe-pr-review** | Fan out 3–6 read-only frontend review personas, synthesize their evidence, and fold in a `qa-demo` run without depending on one forge or model vendor. |
+| **fe-pr-review** | Fan out 3–6 read-only frontend review personas and synthesize their evidence. `qa-demo` is opt-in visual proof, not part of the default review. |
 | **be-pr-review** | Fan out 3–6 backend reviewers across contracts, data, reliability, security, performance, tests, and rollout, then adversarially synthesize revision-bound evidence. |
 | **second-opinion** | Cheap native-model second look at the current change via the host agent's own subagent. Explicit `/second-opinion`, or implicit when `AGENTS.md` says to use it for all sessions. |
 
@@ -85,7 +85,7 @@ Use one command whether the target is frontend, backend, or full-stack:
 /review origin/feature-branch
 ```
 
-The skill resolves one immutable target without switching branches, includes staged, unstaged, and non-ignored untracked files for a dirty checkout, and classifies changed behavior from contracts rather than extensions alone. It then composes `fe-pr-review`, `be-pr-review`, or both on the same `H0`, rechecks for source movement, deduplicates cross-boundary findings, and returns one `PASSABLE`, `BLOCKED`, or `UNVERIFIED` verdict. Self-authored PRs are valid for private preflight review but are never approved or represented as independent human approval.
+The skill resolves one immutable target without switching branches, includes staged, unstaged, and non-ignored untracked files for a dirty checkout, and classifies changed behavior from contracts rather than extensions alone. It then composes `fe-pr-review`, `be-pr-review`, or both on the same `H0`, rechecks for source movement, deduplicates cross-boundary findings, and returns one `PASSABLE`, `BLOCKED`, or `UNVERIFIED` verdict. `qa-demo` is opt-in: `/review` does not record a TestReel unless the user explicitly asks. Self-authored PRs are valid for private preflight review but are never approved or represented as independent human approval.
 
 After freezing the changed-file set, `review` and both specialist skills recall file-local review lessons from Leyline when available, otherwise from `.agents/review-learnings.md`. Lessons only select extra probes or guard known false positives; every current finding is revalidated against the current `H0`, callers, contracts, tests, and disconfirming evidence.
 
@@ -113,10 +113,11 @@ When available, Leyline stores repository/file/reviewer-scoped memory and dedupl
 Use it when a frontend PR needs independent accessibility, rollout, privacy, repository-contract, correctness, and product reviewers plus a separate synthesis pass:
 
 ```text
-/fe-pr-review review <pull-request-url> and use qa-demo when the change is visual
+/fe-pr-review review <pull-request-url>
+/fe-pr-review review <pull-request-url> and use qa-demo
 ```
 
-The coordinator works with the authenticated forge integration already available to the agent. Its dependency-free graph runner snapshots one head, assigns 3–6 read-only personas across installed Claude Code, Codex CLI, and Cursor Agent routes, validates evidence for every declared facet, and runs a distinct synthesis node. Feature-gate review gets a prominent full-path trace from requirement decision through definition, evaluation, off/on behavior, exposure, SSR parity, rollback, tests, and cleanup. Visual proof stays with the installed `qa-demo` skill and can be attached with `--qa-report`. Every completed attempt emits self-contained `report.json`, `report.md`, and `report.html` artifacts. Reports separate the code verdict from operational follow-ups, so routine owner checklists, QA tasks, rollout communication, and post-merge cleanup do not turn sound code into a false failure. Every follow-up has a machine-readable verdict impact, and mandatory safety or pre-approval evidence deterministically overrides an incorrect model pass. Runner exhaustion still produces an explicit `UNVERIFIED` report with all missing code facets instead of silently omitting evidence. The graph runner fails over safe routes, serializes Cursor authentication, isolates Claude from inherited MCP configuration, and never comments, approves, merges, pushes, commits, or deploys.
+The coordinator works with the authenticated forge integration already available to the agent. Its dependency-free graph runner snapshots one head, assigns 3–6 read-only personas across installed Claude Code, Codex CLI, and Cursor Agent routes, validates evidence for every declared facet, and runs a distinct synthesis node. Feature-gate review gets a prominent full-path trace from requirement decision through definition, evaluation, off/on behavior, exposure, SSR parity, rollback, tests, and cleanup. Visual proof stays with the installed `qa-demo` skill and is **opt-in**: run it only when the user explicitly asks, then attach the result with `--qa-report`. Default reviews skip the demo and report QA as `not-run`. Every completed attempt emits self-contained `report.json`, `report.md`, and `report.html` artifacts. Reports separate the code verdict from operational follow-ups, so routine owner checklists, QA tasks, rollout communication, and post-merge cleanup do not turn sound code into a false failure. Every follow-up has a machine-readable verdict impact, and mandatory safety or pre-approval evidence deterministically overrides an incorrect model pass. Runner exhaustion still produces an explicit `UNVERIFIED` report with all missing code facets instead of silently omitting evidence. The graph runner fails over safe routes, serializes Cursor authentication, isolates Claude from inherited MCP configuration, and never comments, approves, merges, pushes, commits, or deploys.
 
 ```bash
 node .agents/skills/fe-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main

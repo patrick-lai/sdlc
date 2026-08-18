@@ -2,9 +2,9 @@
 name: fe-pr-review
 description: >
   Review frontend pull requests with an immutable diff snapshot, 3–6 independent
-  read-only reviewer personas, cross-model synthesis, and qa-demo evidence. Use
-  for deep FE PR review, multi-agent review, accessibility/gating/privacy review,
-  or a review that needs a QA walkthrough before a human verdict.
+  read-only reviewer personas, and cross-model synthesis. qa-demo visual proof is
+  opt-in only when the user explicitly requests it. Use for deep FE PR review,
+  multi-agent review, or accessibility/gating/privacy review.
 ---
 
 # fe-pr-review
@@ -72,11 +72,15 @@ Every review must explicitly test recurring defect shapes that broad “correctn
 
 Mark a probe `not-applicable` only with concrete evidence. A post-merge-only flake is not automatically a review miss; record it as a validation-surface limitation rather than inventing a code defect.
 
-### 3. Use `qa-demo` for visual proof
+### 3. Treat `qa-demo` as opt-in visual proof
 
-For a visual or mixed frontend PR, **activate and follow the installed `qa-demo` skill** on the same `H0`. It owns boot detection, assertions, axe-core scans, captions, TestReel recording, truthful verdicts, and cleanup. Do not recreate those mechanics here.
+Do **not** activate `qa-demo` by default. A visual or mixed frontend change is not enough. Skip boot, TestReel, axe-core recording, and any demo surface unless this invocation **explicitly requests** visual proof (`qa-demo`, TestReel, walkthrough video, "record a demo", "prove it in the browser") or already supplies a `--qa-report` / report path.
 
-Keep QA coordinator-owned rather than inside reviewer subprocesses. After qa-demo finishes, pass its fresh report into synthesis:
+Default: leave QA as `not-run`, continue the review graph immediately, and do not ask whether to run a demo. `not-run` is not a failure and does not downgrade a supported code verdict.
+
+When the user did opt in, **activate and follow the installed `qa-demo` skill** on the same `H0`. It owns boot detection, assertions, axe-core scans, captions, TestReel recording, truthful verdicts, and cleanup. Do not recreate those mechanics here.
+
+Keep QA coordinator-owned rather than inside reviewer subprocesses. After an opted-in qa-demo finishes, pass its fresh report into synthesis:
 
 ```bash
 node .agents/skills/fe-pr-review/scripts/review-graph.mjs synthesize \

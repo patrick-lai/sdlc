@@ -22,7 +22,9 @@ The synthesizer returns `{ "blocking": [], "nonBlocking": [], "unverified": [], 
 
 ## QA evidence
 
-`--qa-report` accepts a fresh qa-demo JSON or Markdown report. The coordinator must establish that its revision equals `H0`. JSON may declare `revision`, `head`, or `h0`; Markdown may use a labelled revision line.
+`qa-demo` is **opt-in**. The graph does not require a demo. Default with no `--qa-report` is `not-run`; that is not a failure and does not change the code verdict.
+
+`--qa-report` accepts a fresh qa-demo JSON or Markdown report when the user requested visual proof or already produced one. The coordinator must establish that its revision equals `H0`. JSON may declare `revision`, `head`, or `h0`; Markdown may use a labelled revision line.
 
 | Situation | Status |
 |---|---|
@@ -31,7 +33,7 @@ The synthesizer returns `{ "blocking": [], "nonBlocking": [], "unverified": [], 
 | Declared revision differs from `H0` | `stale` |
 | Unreadable or no machine-readable revision | `unverified` |
 
-Only `fresh` is usable evidence. Supplied `stale` or `unverified` QA forces a nominal pass down to `unverified`.
+Only `fresh` is usable evidence. Default `not-run` leaves the code verdict unchanged. Supplied `stale` or `unverified` QA forces a nominal pass down to `unverified`.
 
 ## Runner safety
 

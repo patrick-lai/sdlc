@@ -100,7 +100,7 @@ Activate the installed skill or skills immediately after routing:
 
 Give every specialization the same target, base, complete snapshot, and logical `H0`. For immutable Git refs, use each skill's graph runner normally. For a dirty working tree, apply the selected skill's persona, facet, finding, and synthesis contracts directly to the frozen external snapshot; do not point a Git-ref-only runner at moving `HEAD`. An implementation may materialize the snapshot in an isolated temporary repository, but it must preserve the logical worktree `H0` and must never mutate the source checkout.
 
-Frontend review owns feature-gate/UI/accessibility/product risks and invokes `qa-demo` only when visual proof is relevant. Backend review owns API/data/migration/concurrency/security/reliability/rollout risks and revision-bound backend verification. For mixed changes, explicitly trace the boundary contract in both directions and ensure each side's assumptions match.
+Frontend review owns feature-gate/UI/accessibility/product risks. It invokes `qa-demo` only as **opt-in** visual proof when the user **explicitly requests** it (`qa-demo`, TestReel, walkthrough video, or an attached QA report). Do not run qa-demo because the change looks visual. Default QA status is `not-run` and does not affect the code verdict. Backend review owns API/data/migration/concurrency/security/reliability/rollout risks and revision-bound backend verification. For mixed changes, explicitly trace the boundary contract in both directions and ensure each side's assumptions match.
 
 Run only the narrowest blessed checks needed to validate concrete review claims. Verification is evidence, not permission to mutate the reviewed source.
 
@@ -126,7 +126,7 @@ Return one concise report containing:
 - code verdict;
 - blocking findings first, each with exact path/line, trigger, execution path, violated invariant, impact, evidence, confidence, disconfirming reason, smallest fix, and focused verification;
 - non-blocking note when useful;
-- frontend QA and backend verification status when applicable;
+- frontend QA status (`not-run` unless the user opted into qa-demo) and backend verification status when applicable;
 - failed nodes and explicit limitations;
 - learned-knowledge backend and only the lesson IDs that materially changed a probe or conclusion, never raw comments;
 - operational follow-ups, separate from the code verdict.
