@@ -155,11 +155,14 @@ function normalizeFinding(finding, group, index, used) {
     confidence: finding.confidence ?? null,
     impact: finding.impact || finding.rationale || finding.summary || null,
     trigger: finding.trigger || null,
+    reproduction: finding.reproduction || null,
     executionPath: Array.isArray(finding.executionPath) ? finding.executionPath : [],
+    rootCause: finding.rootCause || null,
     violatedContract: finding.violatedContract || null,
     evidence: Array.isArray(finding.evidence) ? finding.evidence : finding.evidence ? [String(finding.evidence)] : [],
     disconfirmingReason: finding.disconfirmingReason || null,
     suggestedFix: finding.suggestedFix || null,
+    suggestedPatch: finding.suggestedPatch || null,
     verification: finding.verification || null,
     summary: finding.impact || finding.rationale || finding.summary || 'See synthesis evidence.',
   }
@@ -357,8 +360,12 @@ export function buildReviewMarkdown(document) {
         lines.push(`- **${f.title}**${loc}: ${f.summary}`)
         if (f.confidence != null) lines.push(`  - confidence: ${f.confidence}`)
         if (f.trigger) lines.push(`  - trigger: ${f.trigger}`)
+        if (f.reproduction) lines.push(`  - reproduce: ${f.reproduction}`)
         if (f.executionPath?.length) lines.push(`  - path: ${f.executionPath.join(' → ')}`)
+        if (f.rootCause) lines.push(`  - root cause: ${f.rootCause}`)
         if (f.suggestedFix) lines.push(`  - fix: ${f.suggestedFix}`)
+        if (f.suggestedPatch) lines.push(`  - suggested patch: ${f.suggestedPatch}`)
+        if (f.verification) lines.push(`  - verification: ${f.verification}`)
       }
       lines.push('')
     }
