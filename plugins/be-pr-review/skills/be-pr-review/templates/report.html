@@ -815,6 +815,15 @@
         gap: 10px;
       }
 
+      .card-list[data-empty="true"]::after {
+        content: "No findings match this search.";
+        padding: 22px 16px;
+        border: 1px dashed var(--line-strong);
+        border-radius: var(--radius);
+        color: var(--faint);
+        background: var(--surface);
+      }
+
       .finding {
         display: grid;
         grid-template-columns: 4px minmax(0, 1fr);
@@ -1066,9 +1075,684 @@
           grid-template-columns: 1fr;
         }
       }
+
+      /* Simple report dashboard ------------------------------------------------ */
+      :root {
+        --bg: #090909;
+        --bg-subtle: #0d0d0d;
+        --surface: #101010;
+        --surface-2: #151515;
+        --surface-3: #1b1b1b;
+        --ink: #f2f2f0;
+        --muted: #a5a5a0;
+        --faint: #74746f;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-strong: rgba(255, 255, 255, 0.18);
+        --accent: #f2f2f0;
+        --accent-soft: rgba(255, 255, 255, 0.08);
+        --shadow: none;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --font: ui-rounded, "SF Pro Rounded", "Nunito Sans", "Avenir Next",
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --mono: "SF Mono", "JetBrains Mono", "Cascadia Code", ui-monospace,
+          Menlo, Consolas, monospace;
+        --sidebar: 232px;
+        --topbar: 64px;
+      }
+
+      html[data-theme="light"] {
+        --bg: #fafafa;
+        --bg-subtle: #f5f5f3;
+        --surface: #ffffff;
+        --surface-2: #f8f8f6;
+        --surface-3: #efefec;
+        --ink: #171715;
+        --muted: #62625d;
+        --faint: #8a8a84;
+        --line: rgba(23, 23, 21, 0.1);
+        --line-strong: rgba(23, 23, 21, 0.18);
+        --accent: #171715;
+        --accent-soft: rgba(23, 23, 21, 0.07);
+        --shadow: none;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      html,
+      body {
+        background: var(--bg);
+        font-size: 14px;
+      }
+
+      body {
+        min-width: 320px;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 3px;
+      }
+
+      .top {
+        position: sticky;
+        top: 0;
+        min-height: var(--topbar);
+        padding: 0 22px 0 calc(var(--sidebar) + 24px);
+        justify-content: flex-end;
+        background: var(--bg);
+        border-bottom-color: var(--line);
+        backdrop-filter: none;
+      }
+
+      .brand {
+        position: fixed;
+        z-index: 42;
+        top: 0;
+        left: 0;
+        width: var(--sidebar);
+        height: var(--topbar);
+        padding: 0 18px;
+        border-right: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .mark {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--ink);
+        box-shadow: none;
+      }
+
+      .mark::after {
+        content: "R";
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: var(--bg);
+        font: 750 14px/1 var(--mono);
+      }
+
+      .brand-copy strong {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .brand-copy span {
+        margin-top: 2px;
+        max-width: 148px;
+        font-size: 9px;
+      }
+
+      .top-jump {
+        display: none;
+      }
+
+      .top-actions {
+        gap: 10px;
+      }
+
+      .btn,
+      .badge {
+        min-height: 34px;
+        border-radius: 9px;
+        background: var(--surface);
+      }
+
+      .btn {
+        padding-inline: 12px;
+        color: var(--ink);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0 10px;
+      }
+
+      .verdict {
+        margin-left: var(--sidebar);
+        background: var(--bg);
+      }
+
+      .verdict-inner {
+        width: auto;
+        max-width: 1440px;
+        margin: 0;
+        padding: 20px 24px;
+        align-items: center;
+      }
+
+      .verdict h1 {
+        font: 750 24px/1.1 var(--font);
+        letter-spacing: -0.035em;
+      }
+
+      .verdict p {
+        margin-top: 6px;
+        max-width: 78ch;
+        font-size: 13px;
+      }
+
+      .verdict-chip {
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: transparent;
+        font-size: 9px;
+      }
+
+      .layout {
+        width: auto;
+        margin: 0;
+        padding: 22px 24px 56px calc(var(--sidebar) + 24px);
+        display: block;
+      }
+
+      .sidebar {
+        position: fixed;
+        z-index: 25;
+        top: var(--topbar);
+        bottom: 0;
+        left: 0;
+        width: var(--sidebar);
+        padding: 18px 14px 28px;
+        display: grid;
+        align-content: start;
+        gap: 12px;
+        overflow-y: auto;
+        border-right: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .top-search {
+        margin-right: auto;
+        width: min(420px, calc(100vw - var(--sidebar) - 260px));
+        min-width: 220px;
+      }
+
+      .panel {
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .panel h2 {
+        margin: 0 8px 8px;
+        font-size: 9px;
+      }
+
+      .search {
+        height: 40px;
+        padding: 0 14px;
+        border-radius: 10px;
+        background: var(--surface);
+        font-size: 13px;
+      }
+
+      .nav {
+        gap: 3px;
+      }
+
+      .nav-group {
+        margin: 14px 8px 5px;
+        font-size: 9px;
+      }
+
+      .nav a {
+        position: relative;
+        padding: 9px 10px 9px 30px;
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 12.5px;
+        font-weight: 650;
+      }
+
+      .nav a::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 12px;
+        width: 7px;
+        height: 7px;
+        border: 1px solid currentColor;
+        border-radius: 50%;
+        transform: translateY(-50%);
+        opacity: 0.72;
+      }
+
+      .nav a:hover {
+        background: var(--surface-2);
+      }
+
+      .nav a.is-active {
+        background: var(--ink);
+        color: var(--bg);
+      }
+
+      .nav a.is-active::before {
+        background: currentColor;
+      }
+
+      .nav-sub {
+        margin-left: 14px;
+        border-left: 1px solid var(--line);
+      }
+
+      .nav-sub a {
+        padding: 6px 8px 6px 16px;
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .nav-sub a::before {
+        display: none;
+      }
+
+      .sidebar > details.panel {
+        margin-top: 8px;
+        border-top: 1px solid var(--line);
+        border-radius: 0;
+      }
+
+      .sidebar > details.panel > summary {
+        padding: 14px 8px 10px;
+        font-size: 11px;
+      }
+
+      .sidebar > details.panel .fold-body {
+        padding: 4px 8px 0;
+      }
+
+      .main {
+        width: min(100%, 1400px);
+        min-height: 520px;
+        gap: 16px;
+      }
+
+      .guide {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .guide a {
+        min-height: 92px;
+        padding: 14px;
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .guide a:hover,
+      .guide a.is-current {
+        border-color: var(--line-strong);
+        background: var(--surface-2);
+      }
+
+      .guide b {
+        font-size: 9px;
+      }
+
+      .guide strong {
+        font-size: 14px;
+      }
+
+      .guide span {
+        line-height: 1.35;
+      }
+
+      body:not([data-page="summary"]) .guide {
+        display: none;
+      }
+
+      .section[data-page-hidden="true"] {
+        display: none;
+      }
+
+      .section {
+        min-width: 0;
+        scroll-margin-top: 86px;
+      }
+
+      .section-head {
+        display: block;
+        margin: 4px 0 16px;
+      }
+
+      .section-head h2 {
+        font-size: 20px;
+        font-weight: 720;
+      }
+
+      .section-head p {
+        margin-top: 5px;
+        max-width: 74ch;
+        font-size: 12.5px;
+      }
+
+      .exec,
+      .fold,
+      .finding,
+      .table-wrap,
+      .gate-banner,
+      .metric,
+      .meta-chip,
+      .empty {
+        box-shadow: none;
+      }
+
+      .exec {
+        padding: 20px;
+      }
+
+      .exec-headline {
+        max-width: 32ch;
+        font-size: 22px;
+        line-height: 1.2;
+      }
+
+      .exec-rationale,
+      .exec-bullets {
+        max-width: 76ch;
+      }
+
+      .exec-stats {
+        gap: 10px;
+      }
+
+      .exec-stat {
+        min-height: 80px;
+        padding: 12px 14px;
+        border-radius: 9px;
+      }
+
+      .exec-stat b {
+        font-size: 23px;
+      }
+
+      .action-item {
+        padding: 13px 14px;
+        border-radius: 9px;
+      }
+
+      .action-num {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        border: 1px solid var(--line-strong);
+        border-radius: 50%;
+      }
+
+      .finding {
+        grid-template-columns: 3px minmax(0, 1fr);
+      }
+
+      .finding-body {
+        padding: 15px 16px 14px;
+      }
+
+      .finding-title {
+        font-size: 15px;
+      }
+
+      .finding-lede {
+        max-width: 82ch;
+      }
+
+      .code-ref {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 4px 7px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg-subtle);
+        color: var(--ink);
+        font: 10.5px/1.3 var(--mono);
+        overflow-wrap: anywhere;
+      }
+
+      .finding details {
+        margin-top: 12px;
+        padding-top: 11px;
+        border-top: 1px solid var(--line);
+      }
+
+      .finding summary {
+        margin-top: 0;
+        color: var(--ink);
+      }
+
+      .kv {
+        gap: 0;
+      }
+
+      .kv div {
+        padding: 10px 0;
+      }
+
+      .kv dd {
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+
+      .gate-banner {
+        background: var(--surface);
+      }
+
+      .table-wrap {
+        border-radius: var(--radius);
+      }
+
+      th {
+        background: var(--surface-2);
+      }
+
+      tbody tr:hover {
+        background: var(--surface-2);
+      }
+
+      .pill {
+        border-radius: 7px;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+
+      .pill[aria-pressed="true"] {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: var(--bg);
+      }
+
+      .is-target {
+        outline-width: 1px;
+        outline-color: var(--ink);
+      }
+
+      .foot {
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        font: 10px/1.5 var(--mono);
+      }
+
+      @media (max-width: 1080px) {
+        .top-search {
+          width: min(330px, calc(100vw - var(--sidebar) - 250px));
+        }
+
+        .guide,
+        .exec-stats {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        :root {
+          --topbar: 58px;
+        }
+
+        .top {
+          padding: 0 14px;
+        }
+
+        .brand {
+          position: static;
+          width: auto;
+          height: auto;
+          margin-right: auto;
+          padding: 0;
+          border: 0;
+          background: transparent;
+        }
+
+        .brand-copy span,
+        .badge {
+          display: none;
+        }
+
+        .mark {
+          width: 30px;
+          height: 30px;
+        }
+
+        .verdict {
+          margin-left: 0;
+        }
+
+        .verdict-inner {
+          padding: 16px;
+        }
+
+        .verdict h1 {
+          font-size: 21px;
+        }
+
+        .layout {
+          padding: 14px 14px 44px;
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        .sidebar {
+          position: sticky;
+          top: var(--topbar);
+          z-index: 20;
+          order: 0;
+          width: calc(100% + 28px);
+          margin: 0 -14px;
+          padding: 8px 14px;
+          display: block;
+          overflow: hidden;
+          border: 0;
+          border-bottom: 1px solid var(--line);
+          background: var(--bg);
+        }
+
+        .top-search {
+          display: none;
+        }
+
+        .sidebar > .panel:nth-child(2) {
+          padding: 0;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+        }
+
+        .nav {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+
+        .nav::-webkit-scrollbar {
+          display: none;
+        }
+
+        .nav > a {
+          flex: 0 0 auto;
+          padding: 8px 11px 8px 27px;
+          white-space: nowrap;
+        }
+
+        .nav-group,
+        .nav-sub,
+        .sidebar .panel h2,
+        .sidebar > details.panel {
+          display: none;
+        }
+
+        .nav a {
+          padding-left: 28px;
+        }
+
+        .main {
+          order: 1;
+        }
+
+        .section {
+          scroll-margin-top: calc(var(--topbar) + 58px);
+        }
+
+        .guide {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .top-actions {
+          gap: 6px;
+        }
+
+        .btn {
+          min-height: 32px;
+          padding-inline: 9px;
+        }
+
+        .verdict-inner {
+          grid-template-columns: 1fr;
+        }
+
+        .verdict-chip {
+          justify-self: start;
+        }
+
+        .guide,
+        .exec-stats,
+        .metrics {
+          grid-template-columns: 1fr;
+        }
+
+        .guide a {
+          min-height: 0;
+        }
+
+        .action-item {
+          grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .action-jump {
+          grid-column: 2;
+          justify-self: start;
+        }
+
+        .kv div {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+      }
     </style>
   </head>
-  <body>
+  <body data-page="summary">
     <a class="skip" href="#section-summary">Skip to summary</a>
     <header class="top">
       <div class="brand">
@@ -1077,6 +1761,16 @@
           <strong>Backend PR Review</strong>
           <span id="brand-meta">Evidence report</span>
         </div>
+      </div>
+      <div class="top-search">
+        <input
+          class="search"
+          id="search"
+          type="search"
+          aria-label="Search this report"
+          placeholder="Search findings or files…"
+          autocomplete="off"
+        />
       </div>
       <nav class="top-jump" id="top-jump" aria-label="Jump to section"></nav>
       <div class="top-actions">
@@ -1098,18 +1792,7 @@
     <div class="layout">
       <aside class="sidebar">
         <div class="panel">
-          <h2>Find</h2>
-          <input
-            class="search"
-            id="search"
-            type="search"
-            placeholder="Findings, files, facets…"
-            autocomplete="off"
-          />
-          <p class="search-hint">Press <kbd>/</kbd> to search. Use Jump for experts.</p>
-        </div>
-        <div class="panel">
-          <h2>Jump</h2>
+          <h2>Report sections</h2>
           <nav class="nav" id="nav"></nav>
         </div>
         <details class="panel fold">
@@ -1398,7 +2081,7 @@
           const tags = el('div', { class: 'finding-meta' })
           tags.appendChild(tag(finding.group, finding.group === 'blocking' ? 'blocked' : finding.group === 'unverified' ? 'unverified' : 'warn'))
           if (finding.lens) tags.appendChild(tag(finding.lens, 'muted'))
-          if (finding.location) tags.appendChild(tag(finding.location, 'muted'))
+          if (finding.location) tags.appendChild(el('code', { class: 'code-ref' }, [finding.location]))
           if (finding.confidence != null)
             tags.appendChild(tag(Math.round(finding.confidence * 100) + '% conf', 'muted'))
 
@@ -1678,7 +2361,12 @@
         }
 
         function wireSearch() {
-          search.addEventListener('input', applySearch)
+          search.addEventListener('input', () => {
+            applySearch()
+            if (search.value.trim() && document.body.dataset.page !== 'findings') {
+              location.hash = 'section-findings'
+            }
+          })
           document.addEventListener('click', (event) => {
             const target = event.target
             if (!(target instanceof HTMLElement)) return
@@ -1693,13 +2381,18 @@
 
         function applySearch() {
           const q = search.value.trim().toLowerCase()
+          let visibleFindings = 0
           for (const node of document.querySelectorAll('.finding[data-group]')) {
             const group = node.getAttribute('data-group')
             const text = (node.getAttribute('data-search') || node.textContent || '').toLowerCase()
             const groupOk = activeFindingFilter === 'all' || activeFindingFilter === group
             const searchOk = !q || text.includes(q)
-            node.setAttribute('data-hidden', String(!(groupOk && searchOk)))
+            const visible = groupOk && searchOk
+            node.setAttribute('data-hidden', String(!visible))
+            if (visible) visibleFindings++
           }
+          const findingList = document.getElementById('finding-list')
+          if (findingList) findingList.setAttribute('data-empty', String(Boolean(q) && visibleFindings === 0))
           for (const row of document.querySelectorAll('.facet-row')) {
             const persona = row.getAttribute('data-persona')
             const status = row.getAttribute('data-status')
@@ -1713,27 +2406,21 @@
 
         function wireNav() {
           const links = [...document.querySelectorAll('[data-nav], [data-guide]')]
-          const observer = new IntersectionObserver(
-            (entries) => {
-              for (const entry of entries) {
-                if (!entry.isIntersecting) continue
-                const id = entry.target.id.replace(/^section-/, '')
-                for (const link of links) {
-                  const key = link.getAttribute('data-nav') || link.getAttribute('data-guide')
-                  link.classList.toggle('is-active', key === id)
-                  if (link.hasAttribute('data-guide')) link.classList.toggle('is-current', key === id)
-                }
-              }
-            },
-            { rootMargin: '-40% 0px -50% 0px', threshold: 0.01 },
-          )
-          const seen = new Set()
           for (const link of links) {
-            const id = link.getAttribute('data-nav') || link.getAttribute('data-guide')
-            if (!id || seen.has(id)) continue
-            seen.add(id)
-            const section = document.getElementById('section-' + id)
-            if (section) observer.observe(section)
+            link.addEventListener('click', () => {
+              if (link.hash === location.hash) requestAnimationFrame(revealHashTarget)
+            })
+          }
+        }
+
+        function syncPageNav(pageId) {
+          for (const link of document.querySelectorAll('[data-nav], [data-guide]')) {
+            const key = link.getAttribute('data-nav') || link.getAttribute('data-guide')
+            const active = key === pageId
+            link.classList.toggle('is-active', active)
+            if (link.hasAttribute('data-guide')) link.classList.toggle('is-current', active)
+            if (active) link.setAttribute('aria-current', 'page')
+            else link.removeAttribute('aria-current')
           }
         }
 
@@ -1758,25 +2445,46 @@
 
         function revealHashTarget() {
           const raw = location.hash.replace(/^#/, '')
-          if (!raw) return
-          let id = raw
+          let id = raw || 'section-summary'
           try {
-            id = decodeURIComponent(raw)
+            id = decodeURIComponent(id)
           } catch {
-            id = raw
+            id = raw || 'section-summary'
           }
-          const target = document.getElementById(id)
+          const requestedTarget = document.getElementById(id)
+          const target = requestedTarget || document.getElementById('section-summary')
           if (!target) return
-          const details = target.querySelector('details')
+          const page = target.classList.contains('section') ? target : target.closest('.section')
+          if (!page) return
+          const pageId = page.id.replace(/^section-/, '')
+
+          for (const section of document.querySelectorAll('.section')) {
+            section.setAttribute('data-page-hidden', String(section !== page))
+            section.setAttribute('aria-hidden', String(section !== page))
+          }
+          document.body.dataset.page = pageId
+          syncPageNav(pageId)
+
+          const pageMeta = [...readPath, ...morePath].find((item) => item.id === pageId)
+          const pageTitle = pageId === 'summary' ? 'Summary' : pageMeta?.title || titleCase(pageId)
+          const reportTitle = document.querySelector('.brand-copy strong')?.textContent || 'PR Review'
+          document.title = pageTitle + ' · ' + reportTitle
+
+          const isDeepTarget = Boolean(raw && requestedTarget && !target.classList.contains('section'))
+          const details = isDeepTarget ? target.querySelector('details') : null
           if (details) details.open = true
           document.querySelectorAll('.is-target').forEach((node) => node.classList.remove('is-target'))
-          target.classList.add('is-target')
-          target.scrollIntoView({ block: 'start', behavior: 'smooth' })
+          if (isDeepTarget) target.classList.add('is-target')
+          requestAnimationFrame(() => {
+            if (raw && requestedTarget) target.scrollIntoView({ block: 'start', behavior: 'smooth' })
+            else window.scrollTo({ top: 0, behavior: 'auto' })
+          })
         }
 
         function syncThemeLabel() {
           const light = document.documentElement.dataset.theme === 'light'
-          themeToggle.textContent = light ? 'Dark theme' : 'Light theme'
+          themeToggle.textContent = light ? 'Dark' : 'Light'
+          themeToggle.setAttribute('aria-label', light ? 'Use dark theme' : 'Use light theme')
         }
 
         function nextLink(id, label) {
