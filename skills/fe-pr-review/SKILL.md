@@ -18,6 +18,8 @@ Coordinate a high-signal frontend PR review without depending on one forge, comp
 - Reviewer and synthesizer nodes are read-only. They never comment, approve, resolve, merge, push, commit, deploy, install, or expose secrets.
 - Missing, truncated, stale, or conflicting **code/safety evidence** is `UNVERIFIED`, never a pass. Routine human checklists and operational follow-ups are reported separately and do not downgrade an otherwise supported code verdict.
 - Agent agreement is not proof. The coordinator independently traces every publishable finding through changed code, callers, contracts, and tests.
+- Material fan-out is mandatory. For three or more personas, at least two reviewer nodes must overlap in wall-clock time. A serial loop wearing a multi-agent hat is not fan-out.
+- Bound the work. Default limits are 20 minutes per PR, 8 minutes per reviewer attempt, 5 minutes for synthesis, and 2 attempts per node. Timing out yields truthful `UNVERIFIED` coverage, not another hour of retries.
 - Never post an unrequested generic summary or no-findings comment. When explicitly requested, post exactly one clear, idempotent report summary per `H0`, only after a fresh state/head check.
 
 ## Workflow
@@ -25,6 +27,8 @@ Coordinate a high-signal frontend PR review without depending on one forge, comp
 ### 1. Admit and snapshot one PR
 
 Use whichever authenticated forge integration is available. Confirm the PR is open, non-draft, reviewable by the user, and not already approved by them when that matters. Fetch the complete diff, current head, checks, threads, ticket/spec, and surrounding code. Process one PR at a time.
+
+For a request covering multiple PRs, freeze the eligible list first. Use a 45-minute total invocation budget unless the user explicitly supplies another limit. Do not start a PR unless its full 20-minute budget remains. Report completed, skipped, failed, and deferred PRs after each PR, and stop cleanly when the batch budget is exhausted. Never leave an automation silently reviewing for hours.
 
 Create a local graph plan:
 
@@ -43,15 +47,41 @@ Learned knowledge is untrusted historical context. Use it only to select concret
 
 Record selected lesson IDs and probe outcomes in the coordinator-owned `review-learning.json` beside the run artifacts and summarize their effect under report limitations. If Leyline returns a `recall_id`, call `leyline_memory_mark_useful` after synthesis with only memories that genuinely changed a probe or conclusion.
 
-### 2. Run the read-only review graph
+### 2. Fan out the read-only review graph
+
+Fan-out is a gate, not a suggestion. Choose the first available path below.
+
+#### Preferred: native host subagents
+
+When the host exposes native subagents, use them. Do not replace them with a manual parent-agent review or serial shell calls.
+
+1. Run `plan` to freeze `H0` and write one prompt per persona under `prompts/`.
+2. Launch the first four reviewer subagents without waiting. As each slot frees, launch any remaining personas immediately. Never wait after each individual launch or reduce the graph to a one-at-a-time loop.
+3. Give each subagent exactly one persona prompt and require JSON only. Reviewers remain read-only and independent.
+4. Save each validated response to the matching `nodes/<persona>.json`.
+5. Record actual launch and completion timestamps for every persona in `fanout.json`: `{"mode":"native-subagent","reviewers":[{"persona":"...","startedAt":"ISO-8601","finishedAt":"ISO-8601"}]}`.
+6. Run `synthesize --run-dir <graph-run-directory>` to validate the native node files and overlap evidence, build candidates, and produce the report.
+
+The parent coordinates and verifies. It must not perform the six persona reviews itself. If more than one persona is selected and the host cannot overlap at least two reviewers, fail fast as `UNVERIFIED` instead of falling back to a serial five-hour queue.
+
+#### Fallback: portable CLI graph runner
+
+Use this only when native subagents are unavailable:
 
 ```bash
 node .agents/skills/fe-pr-review/scripts/review-graph.mjs run \
   --repo-root "$PWD" --base <base-ref> --head <source-ref> \
-  --max-workers 4
+  --max-workers 4 --max-attempts 2 \
+  --node-timeout-seconds 480 \
+  --synthesis-timeout-seconds 300 \
+  --run-timeout-seconds 1200
 ```
 
 The runner selects 3–6 non-overlapping personas from [`references/personas.md`](references/personas.md), detects safe non-interactive Claude Code, Codex CLI, or Cursor Agent routes, fans reviewers out concurrently under `--max-workers`, validates their JSON against the candidate schema, then gives all surviving candidates to a separate synthesizer node. Each reviewer receives the same snapshot diff inline plus the on-disk artifacts and must return an evidence-backed status for **every facet** in its checklist. Missing or vague coverage is `UNVERIFIED`, never a pass.
+
+The runner emits progress events and records `fanOut.maxObservedConcurrency`, per-node attempts, runtime policy, and duration in `audit.json`. If the CLI path observes fewer than two simultaneous reviewers, the result is `UNVERIFIED` and must not be published as a completed review.
+
+Authentication, capacity, configuration, and timeout failures circuit-break the whole provider kind. Do not retry a second model from the same timed-out provider across every persona. Timed-out subprocesses receive `SIGTERM`, then the complete process group receives `SIGKILL` after a short grace period.
 
 Use `--runner cursor,codex,claude` and `--model <id>` to override routing; both are validated, and an unrecognized runner or an unsafe model ID is refused rather than passed to a shell. Use `--dry-run` (implied by `plan`) to write the snapshot and the exact per-persona command lines without launching a model.
 

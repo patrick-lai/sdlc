@@ -88,6 +88,10 @@ const VALID_VERDICT = new Set(['blocked', 'passable', 'unverified'])
 const UNSAFE_FLAG_RE = /(?:bypass|dangerous|danger-full|yolo|--force|no-sandbox|skip-permission|auto-approve|full-auto|write)/i
 const DIFF_PROMPT_LIMIT = 200_000
 const QA_PROMPT_LIMIT = 40_000
+const DEFAULT_NODE_TIMEOUT_SECONDS = 8 * 60
+const DEFAULT_SYNTHESIS_TIMEOUT_SECONDS = 5 * 60
+const DEFAULT_RUN_TIMEOUT_SECONDS = 20 * 60
+const DEFAULT_MAX_ATTEMPTS = 2
 
 export const FEATURE_GATE_CLEANUP_GUARD = `FEATURE-GATE CLEANUP FALSE-POSITIVE GUARD
 When a PR explicitly removes a feature gate and selects its winning branch, treat full rollout as the cleanup precondition unless repository policy requires attached rollout proof or inspected evidence says otherwise. Compare H0 with the pre-cleanup winning branch. Differences confined to the intentionally discarded losing branch are expected, not defects. A nested gate or side effect used only by the losing branch is retired with that branch; do not require it on the winning path unless that path already used it or an explicit contract requires it. “Some cohort might still be off” is hypothetical, not a reachable trigger. Missing external targeting data alone must not create a code finding or an UNVERIFIED verdict; at most record a non-blocking operational follow-up.`
@@ -139,7 +143,6 @@ export function discoverRunners({ available, cursorModels, runner, model } = {})
     codex: commandExists('codex'),
     claude: commandExists('claude'),
   }
-  const models = cursorModels ?? (has.cursor ? advertisedCursorModels() : [])
   const only = runner ? String(runner).split(',').map((x) => x.trim()).filter(Boolean) : null
   if (only) {
     const unknown = only.filter((id) => !['cursor', 'codex', 'claude'].includes(id))
@@ -147,6 +150,7 @@ export function discoverRunners({ available, cursorModels, runner, model } = {})
   }
   if (model) assertSafeModelId(model)
   const allowed = (id) => !only || only.includes(id)
+  const models = cursorModels ?? (has.cursor && allowed('cursor') ? advertisedCursorModels() : [])
   const routes = []
   if (has.cursor && allowed('cursor')) {
     const preferences = model ? [model] : [
@@ -338,27 +342,71 @@ export function makePlan(snapshot, selected, routes, maxWorkers = 4, includeQa =
     base: snapshot.base,
     diffHash: snapshot.diffHash,
     personas: selected,
-    maxWorkers: Math.max(1, Math.min(Number(maxWorkers) || 4, 6)),
+    maxWorkers: Math.max(selected.length > 1 ? 2 : 1, Math.min(Number(maxWorkers) || 4, 6)),
     routes: selected.map((persona, index) => ({ persona, route: routes[index % Math.max(routes.length, 1)]?.id || null })),
+    prompts: selected.map((persona) => ({ persona, path: `prompts/${persona}.md`, output: `nodes/${persona}.json` })),
     qa: { status: 'not-run' },
     graph: [...selected.map((id) => ({ id: `review:${id}`, dependsOn: [] })), { id: 'synthesis', dependsOn: synthesisDependsOn }],
   }
 }
 
-function execute(route, prompt, repoRoot, evidenceDir, timeoutMs = 20 * 60 * 1000) {
+function boundedInteger(value, fallback, min, max) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(min, Math.min(Math.trunc(parsed), max))
+}
+
+export function runtimePolicy(options = {}, prior = {}) {
+  return {
+    nodeTimeoutSeconds: boundedInteger(options.nodeTimeoutSeconds ?? prior.nodeTimeoutSeconds, DEFAULT_NODE_TIMEOUT_SECONDS, 1, 60 * 60),
+    synthesisTimeoutSeconds: boundedInteger(options.synthesisTimeoutSeconds ?? prior.synthesisTimeoutSeconds, DEFAULT_SYNTHESIS_TIMEOUT_SECONDS, 1, 30 * 60),
+    runTimeoutSeconds: boundedInteger(options.runTimeoutSeconds ?? prior.runTimeoutSeconds, DEFAULT_RUN_TIMEOUT_SECONDS, 2, 90 * 60),
+    maxAttempts: boundedInteger(options.maxAttempts ?? prior.maxAttempts, DEFAULT_MAX_ATTEMPTS, 1, 3),
+  }
+}
+
+function stopChild(child, signal = 'SIGTERM') {
+  if (!child.pid) return
+  try {
+    if (process.platform === 'win32') child.kill(signal)
+    else process.kill(-child.pid, signal)
+  } catch {
+    try { child.kill(signal) } catch {}
+  }
+}
+
+export function executeRunner(route, prompt, repoRoot, evidenceDir, timeoutMs) {
   const spec = buildRunnerCommand(route, repoRoot, evidenceDir)
   return new Promise((resolve, reject) => {
     const args = spec.promptViaStdin ? spec.args : [...spec.args, prompt]
-    const child = spawn(spec.command, args, { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'], env: process.env })
+    const child = spawn(spec.command, args, {
+      cwd: repoRoot,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: process.env,
+      detached: process.platform !== 'win32',
+    })
     let stdout = ''; let stderr = ''
-    const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error(`Runner timed out after ${timeoutMs}ms`)) }, timeoutMs)
+    let settled = false
+    let hardStop = null
+    const finish = (fn, value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      fn(value)
+    }
+    const timer = setTimeout(() => {
+      stopChild(child)
+      hardStop = setTimeout(() => stopChild(child, 'SIGKILL'), 2000)
+      const detail = stderr.trim() ? `: ${stderr.slice(-500)}` : ''
+      finish(reject, new Error(`Runner timed out after ${timeoutMs}ms${detail}`))
+    }, timeoutMs)
     child.stdout.on('data', (chunk) => { stdout += chunk })
     child.stderr.on('data', (chunk) => { stderr += chunk })
-    child.on('error', (error) => { clearTimeout(timer); reject(error) })
+    child.on('error', (error) => finish(reject, error))
     child.on('close', (code) => {
-      clearTimeout(timer)
-      if (code === 0) resolve(stdout)
-      else reject(new Error(`${route.id} exited ${code}: ${stderr.slice(-2000)}`))
+      if (hardStop) clearTimeout(hardStop)
+      if (code === 0) finish(resolve, stdout)
+      else finish(reject, new Error(`${route.id} exited ${code}: ${stderr.slice(-2000)}`))
     })
     if (spec.promptViaStdin) child.stdin.end(prompt); else child.stdin.end()
   })
@@ -373,6 +421,13 @@ export function classifyRunnerFailure(error) {
   return 'node'
 }
 
+export function shouldCircuitBreakProvider(error, category = classifyRunnerFailure(error)) {
+  return category === 'capacity'
+    || category === 'auth'
+    || category === 'configuration'
+    || (category === 'transient' && /timed out/i.test(String(error?.message || error)))
+}
+
 function rotatedRoutes(routes, start) {
   return routes.map((_, offset) => routes[(start + offset) % routes.length])
 }
@@ -383,6 +438,70 @@ async function mapLimit(items, limit, fn) {
     while (true) { const index = next++; if (index >= items.length) return; results[index] = await fn(items[index], index) }
   }))
   return results
+}
+
+function writeReviewerPrompts(runDir, selected, snapshot) {
+  const promptDir = path.join(runDir, 'prompts')
+  fs.mkdirSync(promptDir, { recursive: true })
+  for (const persona of selected) fs.writeFileSync(path.join(promptDir, `${persona}.md`), reviewerPrompt(persona, snapshot, runDir))
+}
+
+function readNodeResults(runDir, selected, priorNodes = []) {
+  const priorByPersona = new Map(priorNodes.map((node) => [node.persona, node]))
+  return selected.map((persona) => {
+    const file = path.join(runDir, 'nodes', `${persona}.json`)
+    const prior = priorByPersona.get(persona)
+    if (!fs.existsSync(file)) {
+      return { persona, route: prior?.route || null, model: prior?.model || null, status: 'failed', error: 'Native reviewer output is missing.', attempts: prior?.attempts || [] }
+    }
+    try {
+      const value = validateCandidate(JSON.parse(fs.readFileSync(file, 'utf8')), persona)
+      return {
+        persona,
+        route: prior?.route || 'native-subagent',
+        model: prior?.model || null,
+        status: 'ok',
+        findings: value.findings.length,
+        attempts: prior?.attempts || [{ route: 'native-subagent', status: 'ok' }],
+        value,
+      }
+    } catch (error) {
+      return { persona, route: prior?.route || 'native-subagent', model: prior?.model || null, status: 'failed', error: String(error.message).slice(0, 500), attempts: prior?.attempts || [] }
+    }
+  })
+}
+
+function candidatesFromNodes(nodeResults) {
+  return nodeResults
+    .filter((node) => node.status === 'ok')
+    .flatMap((node) => node.value.findings.map((finding) => ({ ...finding, persona: node.persona, sourceRoute: node.route })))
+}
+
+function readNativeFanOut(runDir, selected) {
+  const file = path.join(runDir, 'fanout.json')
+  if (!fs.existsSync(file)) return { mode: 'native-subagent', maxObservedConcurrency: 0, evidence: null, error: 'fanout.json is missing.' }
+  try {
+    const value = JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (value?.mode !== 'native-subagent' || !Array.isArray(value.reviewers)) throw new Error('fanout.json needs mode native-subagent and a reviewers array')
+    const reviewers = value.reviewers.map((row) => {
+      const startedAt = Date.parse(row.startedAt)
+      const finishedAt = Date.parse(row.finishedAt)
+      if (!selected.includes(row.persona) || !Number.isFinite(startedAt) || !Number.isFinite(finishedAt) || finishedAt <= startedAt) throw new Error('fanout.json contains an invalid reviewer interval')
+      return { persona: row.persona, startedAt, finishedAt }
+    })
+    if (reviewers.length !== selected.length || new Set(reviewers.map((row) => row.persona)).size !== selected.length) throw new Error('fanout.json must include every selected persona exactly once')
+    const events = reviewers.flatMap((row) => [[row.startedAt, 1], [row.finishedAt, -1]])
+      .sort((a, b) => a[0] - b[0] || b[1] - a[1])
+    let active = 0
+    let maxObservedConcurrency = 0
+    for (const [, delta] of events) {
+      active += delta
+      maxObservedConcurrency = Math.max(maxObservedConcurrency, active)
+    }
+    return { mode: 'native-subagent', maxObservedConcurrency, reviewerCount: reviewers.length, evidence: 'fanout.json' }
+  } catch (error) {
+    return { mode: 'native-subagent', maxObservedConcurrency: 0, evidence: 'fanout.json', error: String(error.message).slice(0, 500) }
+  }
 }
 
 export function qaEvidence(file, h0) {
@@ -452,9 +571,12 @@ export async function runGraph(options, injected = {}) {
   const priorPlan = created.selected ? null : JSON.parse(fs.readFileSync(path.join(created.runDir, 'plan.json')))
   const selected = created.selected || priorPlan.personas
   const routes = injected.routes || discoverRunners(options)
+  const runtime = runtimePolicy(options, priorPlan?.runtime)
   const plan = makePlan(created.snapshot, selected, routes, options.maxWorkers || priorPlan?.maxWorkers, Boolean(options.qaReport))
+  plan.runtime = runtime
   const qa = qaEvidence(options.qaReport, created.snapshot.h0)
   plan.qa = { ...qa, content: undefined }
+  writeReviewerPrompts(created.runDir, selected, created.snapshot)
   writeJson(path.join(created.runDir, 'plan.json'), plan)
   fs.mkdirSync(path.join(created.runDir, 'nodes'), { recursive: true })
   if (options.dryRun) {
@@ -469,76 +591,101 @@ export async function runGraph(options, injected = {}) {
     writeJson(path.join(created.runDir, 'audit.json'), audit)
     return { runDir: created.runDir, plan, audit, commands }
   }
-  if (!routes.length) throw new Error('No safe read-only runner is available; use --dry-run or install/configure a supported CLI')
-  const exec = injected.execute || execute
+  if (!routes.length) throw new Error('No safe read-only runner is available for synthesis; use --dry-run or install/configure a supported CLI')
+  const exec = injected.execute || executeRunner
+  const onProgress = injected.onProgress || (() => {})
+  const runStartedAt = Date.now()
+  const runDeadline = runStartedAt + runtime.runTimeoutSeconds * 1000
+  const reviewDeadline = Math.max(runStartedAt + 1000, runDeadline - runtime.synthesisTimeoutSeconds * 1000)
+  const remaining = (deadline) => Math.max(0, deadline - Date.now())
   let nodeResults
   let candidates
+  let fanOutMode = synthesisOnly ? 'native-subagent-or-prior-run' : 'cli-subprocess'
+  let activeReviewers = 0
+  let maxObservedConcurrency = 0
+  const unhealthyProviders = new Map()
   if (synthesisOnly) {
-    const candidatesFile = path.join(created.runDir, 'candidates.json')
-    if (!fs.existsSync(candidatesFile)) throw new Error('synthesize requires candidates.json from a completed fan-out')
-    candidates = JSON.parse(fs.readFileSync(candidatesFile))
     const auditFile = path.join(created.runDir, 'audit.json')
-    nodeResults = fs.existsSync(auditFile) ? (JSON.parse(fs.readFileSync(auditFile)).nodes || []) : []
-    nodeResults = nodeResults.map((node) => {
-      const file = path.join(created.runDir, 'nodes', `${node.persona}.json`)
-      return node.status === 'ok' && fs.existsSync(file) ? { ...node, value: JSON.parse(fs.readFileSync(file)) } : node
-    })
+    const priorAudit = fs.existsSync(auditFile) ? JSON.parse(fs.readFileSync(auditFile)) : {}
+    nodeResults = readNodeResults(created.runDir, selected, priorAudit.nodes || [])
+    candidates = candidatesFromNodes(nodeResults)
+    writeJson(path.join(created.runDir, 'candidates.json'), candidates)
+    const nativeFanOut = readNativeFanOut(created.runDir, selected)
+    const priorFanOut = priorAudit.fanOut?.mode === 'cli-subprocess' ? priorAudit.fanOut : null
+    const fanOut = priorFanOut || nativeFanOut
+    fanOutMode = fanOut.mode
+    maxObservedConcurrency = fanOut.maxObservedConcurrency || 0
   } else {
-    const unhealthyRoutes = new Map()
-    const runnerLocks = new Map()
-    const runWithLock = async (route, fn) => {
-      if (route.kind !== 'cursor') return fn()
-      const previous = runnerLocks.get(route.kind) || Promise.resolve()
-      let release
-      const current = new Promise((resolve) => { release = resolve })
-      runnerLocks.set(route.kind, previous.then(() => current))
-      await previous
-      try { return await fn() } finally { release() }
-    }
     nodeResults = await mapLimit(selected, plan.maxWorkers, async (persona, index) => {
       const attempts = []
+      let launches = 0
       for (const route of rotatedRoutes(routes, index % routes.length)) {
-        if (unhealthyRoutes.has(route.id)) {
-          attempts.push({ route: route.id, status: 'skipped', category: unhealthyRoutes.get(route.id) })
+        if (launches >= runtime.maxAttempts) break
+        if (unhealthyProviders.has(route.kind)) {
+          attempts.push({ route: route.id, status: 'skipped', category: unhealthyProviders.get(route.kind) })
           continue
         }
+        const timeoutMs = Math.min(runtime.nodeTimeoutSeconds * 1000, remaining(reviewDeadline))
+        if (timeoutMs <= 0) {
+          attempts.push({ route: route.id, status: 'skipped', category: 'budget', error: 'Review wall-clock budget exhausted.' })
+          break
+        }
+        launches++
         try {
-          const raw = await runWithLock(route, async () => {
-            if (unhealthyRoutes.has(route.id)) throw new Error(`Runner unavailable after another node failed: ${unhealthyRoutes.get(route.id)}`)
-            return exec(route, reviewerPrompt(persona, created.snapshot, created.runDir), created.snapshot.repoRoot, created.runDir)
-          })
+          onProgress({ phase: 'review', status: 'started', persona, route: route.id, attempt: launches })
+          activeReviewers++
+          maxObservedConcurrency = Math.max(maxObservedConcurrency, activeReviewers)
+          const raw = await exec(route, reviewerPrompt(persona, created.snapshot, created.runDir), created.snapshot.repoRoot, created.runDir, timeoutMs)
           const value = validateCandidate(extractJson(raw), persona)
           writeJson(path.join(created.runDir, 'nodes', `${persona}.json`), value)
           attempts.push({ route: route.id, status: 'ok' })
+          onProgress({ phase: 'review', status: 'completed', persona, route: route.id, attempt: launches, findings: value.findings.length })
           return { persona, route: route.id, model: route.model || null, status: 'ok', findings: value.findings.length, attempts, value }
         } catch (error) {
           const category = classifyRunnerFailure(error)
           const message = String(error.message).slice(0, 500)
           attempts.push({ route: route.id, status: 'failed', category, error: message })
-          if (category === 'capacity' || category === 'auth' || category === 'configuration') unhealthyRoutes.set(route.id, category)
+          onProgress({ phase: 'review', status: 'failed', persona, route: route.id, attempt: launches, category, error: message })
+          if (shouldCircuitBreakProvider(error, category)) unhealthyProviders.set(route.kind, category)
+        } finally {
+          activeReviewers--
         }
       }
       return { persona, route: null, model: null, status: 'failed', error: 'No runner produced valid evidence.', attempts }
     })
-    candidates = nodeResults
-      .filter((n) => n.status === 'ok')
-      .flatMap((n) => n.value.findings.map((finding) => ({ ...finding, persona: n.persona, sourceRoute: n.route })))
+    candidates = candidatesFromNodes(nodeResults)
     writeJson(path.join(created.runDir, 'candidates.json'), candidates)
   }
   const liveHead = git(created.snapshot.repoRoot, ['rev-parse', created.snapshot.headRef || 'HEAD'])
   if (liveHead !== created.snapshot.h0) throw new Error(`Source head moved from H0 ${created.snapshot.h0} to ${liveHead}; discard this run`)
   let synthesis = null; let synthesisError = null; let synthesisRoute = null
   const synthesisAttempts = []
+  let synthesisLaunches = 0
   for (const route of rotatedRoutes(routes, selected.length % routes.length)) {
+    if (synthesisLaunches >= runtime.maxAttempts) break
+    if (!synthesisOnly && unhealthyProviders.has(route.kind)) {
+      synthesisAttempts.push({ route: route.id, status: 'skipped', category: unhealthyProviders.get(route.kind) })
+      continue
+    }
+    const timeoutMs = Math.min(runtime.synthesisTimeoutSeconds * 1000, remaining(runDeadline))
+    if (timeoutMs <= 0) {
+      synthesisError = 'Run wall-clock budget exhausted before synthesis.'
+      synthesisAttempts.push({ route: route.id, status: 'skipped', category: 'budget', error: synthesisError })
+      break
+    }
+    synthesisLaunches++
     try {
-      const raw = await exec(route, synthesisPrompt(created.snapshot, candidates, qa), created.snapshot.repoRoot, created.runDir)
+      onProgress({ phase: 'synthesis', status: 'started', route: route.id, attempt: synthesisLaunches })
+      const raw = await exec(route, synthesisPrompt(created.snapshot, candidates, qa), created.snapshot.repoRoot, created.runDir, timeoutMs)
       synthesis = validateSynthesis(extractJson(raw))
       synthesisRoute = route.id
       synthesisAttempts.push({ route: route.id, status: 'ok' })
+      onProgress({ phase: 'synthesis', status: 'completed', route: route.id, attempt: synthesisLaunches, verdict: synthesis.verdict })
       break
     } catch (error) {
       synthesisError = String(error.message).slice(0, 1000)
       synthesisAttempts.push({ route: route.id, status: 'failed', category: classifyRunnerFailure(error), error: synthesisError })
+      onProgress({ phase: 'synthesis', status: 'failed', route: route.id, attempt: synthesisLaunches, error: synthesisError })
     }
   }
   const synthesisProducedByRunner = synthesis != null
@@ -554,6 +701,21 @@ export async function runGraph(options, injected = {}) {
   }
   const failedNodes = nodeResults.filter((node) => node.status === 'failed').length
   if (failedNodes && synthesis.verdict === 'passable') synthesis = { ...synthesis, verdict: 'unverified', rationale: `${failedNodes} reviewer node(s) failed; ${synthesis.rationale}` }
+  const fanOutFailed = selected.length > 1
+    && plan.maxWorkers > 1
+    && (fanOutMode === 'cli-subprocess' || fanOutMode === 'native-subagent')
+    && maxObservedConcurrency < 2
+  if (fanOutFailed) {
+    synthesis = {
+      ...synthesis,
+      unverified: [
+        ...(synthesis.unverified || []),
+        { title: 'Reviewer fan-out did not materialize', summary: 'The runner observed fewer than two reviewer nodes active at once.' },
+      ],
+      verdict: synthesis.verdict === 'blocked' ? 'blocked' : 'unverified',
+      rationale: `Reviewer fan-out did not materialize; ${synthesis.rationale}`,
+    }
+  }
   const facetCoverage = buildFacetCoverage(nodeResults, selected)
   const rolloutResult = nodeResults.find((node) => node.persona === 'rollout-gates' && node.status === 'ok')?.value
   const gateUnknown = selected.includes('rollout-gates') && rolloutResult?.gateRequirement?.status === 'unverified'
@@ -573,6 +735,11 @@ export async function runGraph(options, injected = {}) {
     personas: selected,
     routes: routes.map(({ id, kind, model }) => ({ id, kind, model: model || null })),
     maxWorkers: plan.maxWorkers,
+    runtime,
+    durationMs: Date.now() - runStartedAt,
+    fanOut: synthesisOnly && fanOutMode === 'native-subagent'
+      ? readNativeFanOut(created.runDir, selected)
+      : { mode: fanOutMode, maxObservedConcurrency },
     nodes: auditNodes,
     parseFailures: auditNodes.filter((node) => node.status === 'failed').length,
     candidateCount: candidates.length,
@@ -580,7 +747,7 @@ export async function runGraph(options, injected = {}) {
     synthesis: synthesisProducedByRunner
       ? { status: 'ok', verdict: synthesis.verdict, route: synthesisRoute, attempts: synthesisAttempts }
       : { status: 'failed', verdict: 'unverified', error: synthesisError, attempts: synthesisAttempts },
-    status: synthesisProducedByRunner ? 'complete' : 'unverified',
+    status: synthesisProducedByRunner && !fanOutFailed ? 'complete' : 'unverified',
     report: { json: 'report.json', markdown: 'report.md', html: 'report.html' },
   }
   writeJson(path.join(created.runDir, 'audit.json'), audit)
@@ -595,11 +762,16 @@ Usage:
   review-graph.mjs plan --repo-root DIR [--base REF] [--head REF] [--output DIR] [--personas a,b,c]
   review-graph.mjs run --repo-root DIR [--base REF] [--head REF] [--output DIR]
       [--personas a,b,c] [--runner cursor,codex,claude] [--model ID]
-      [--max-workers N] [--qa-report FILE] [--dry-run]
+      [--max-workers N] [--max-attempts N] [--node-timeout-seconds N]
+      [--synthesis-timeout-seconds N] [--run-timeout-seconds N]
+      [--qa-report FILE] [--dry-run]
   review-graph.mjs synthesize --run-dir DIR [--qa-report FILE] [--runner ...] [--model ID]
 
 Notes:
   plan always behaves as a dry run and launches no model.
+  plan writes one native-subagent prompt per persona under prompts/.
+  Defaults bound each PR to 20 minutes, each reviewer attempt to 8 minutes,
+  synthesis to 5 minutes, and each node to at most 2 runner attempts.
   --output must be outside the reviewed repository.
   --qa-report is opt-in: a fresh report produced separately by the qa-demo skill. Omit it to leave QA as not-run.`)
 }
@@ -611,7 +783,9 @@ async function main() {
   else if (args.command === 'synthesize') {
     if (!args.runDir) throw new Error('synthesize requires --run-dir')
   } else if (args.command !== 'run') throw new Error(`Unknown command: ${args.command}`)
-  const result = await runGraph(args)
+  const result = await runGraph(args, {
+    onProgress: (event) => console.error(`[fe-pr-review] ${JSON.stringify(event)}`),
+  })
   console.log(JSON.stringify({ runDir: result.runDir, h0: result.plan.h0, status: result.audit?.status || 'planned', personas: result.plan.personas, routes: result.plan.routes, qa: result.plan.qa }, null, 2))
 }
 
