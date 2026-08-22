@@ -21,6 +21,7 @@ The schedule prompt should stay lean. It identifies the eligible PR source and r
 - A self-authored PR is valid for private preflight review, but never approve it or represent the result as independent human approval.
 - Missing, stale, truncated, timed-out, conflicting, or secret-redacted code or safety evidence is `UNVERIFIED`, never a pass.
 - Preserve internal `PASSABLE`, `BLOCKED`, and `UNVERIFIED`. Public reports expose only `ACCEPT` or `REJECT`; `UNVERIFIED` maps to `REJECT: incomplete`.
+- In Codex, the parent agent owns the review graph and launches built-in subagents directly. It never substitutes Cursor, Claude, Codex CLI, or another external model runner unless the user explicitly requests portable CLI review.
 - Never merge. Automatic PR comments and Slack notifications are outside scheduled review. An additional explicit request to publish blocker comments permits only the verified inline blocker comments described in [`references/blocking-pr-comment.md`](references/blocking-pr-comment.md).
 
 ## 1. Resolve a single target
@@ -45,7 +46,7 @@ Scheduled batch mode is a bounded outer harness:
 5. Give every worker one absolute 30-minute deadline covering snapshot, routing, specialist fan-out, synthesis, coordinator verification, fresh `H0` check, report rendering, Statlas upload, and URL verification.
 6. Every admitted completed or timed-out PR gets a truthful Statlas report. Timeout maps to `REJECT: incomplete`.
 
-Each worker invokes this skill for exactly one frozen PR. Frontend, backend, and mixed specialist work happens inside that worker. The batch coordinator does not create persona reviewers itself.
+Each top-level worker is a built-in subagent owned by the batch parent and invokes this skill for exactly one frozen PR. Frontend, backend, and mixed specialist work happens inside that worker. The worker launches its own bounded built-in specialist subagents when the host supports nested native fan-out.
 
 ## 2. Freeze one complete snapshot
 
@@ -85,9 +86,9 @@ Write `route.json` with evidence. Route only frontend labels to `frontend`, only
 
 Give every specialization the same target, base, complete snapshot, and logical `H0`, plus the same deadline and normalized review-learning handoff. For dirty worktrees, apply specialist contracts to the frozen external snapshot rather than pointing a Git-ref-only runner at moving `HEAD`.
 
-Frontend review owns feature-gate, UI, accessibility, privacy, and product risks. Its native fan-out is preferred, uses no more than six personas, requires material overlap, and allows only bounded optional depth-2 probe children. Backend review owns API, data, migration, concurrency, security, reliability, rollout, and revision-bound verification.
+Frontend review owns feature-gate, UI, accessibility, privacy, and product risks. In Codex, its parent-owned native fan-out is mandatory, uses no more than six personas, requires material overlap, and allows only bounded optional depth-2 probe children. Backend review owns API, data, migration, concurrency, security, reliability, rollout, and revision-bound verification.
 
-Do not run `qa-demo` by default. It is opt-in only when visual proof is explicitly requested or a same-revision report is supplied. Do not run broad builds or test suites, install dependencies, retry every provider, post automatic PR comments or Slack messages, exceed specialist persona caps, or start work that cannot fit the remaining time.
+Do not run `qa-demo` by default. It is opt-in only when visual proof is explicitly requested or a same-revision report is supplied. Do not run broad builds or test suites, install dependencies, retry every provider, post automatic PR comments or Slack messages, exceed specialist persona caps, or start work that cannot fit the remaining time. Do not call the FE portable `run` command or launch `cursor-agent`, `claude`, or `codex` subprocesses unless the user explicitly requests portable CLI review.
 
 ## 5. Synthesize one internal verdict
 

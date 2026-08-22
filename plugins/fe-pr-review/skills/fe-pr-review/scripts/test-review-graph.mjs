@@ -6,10 +6,12 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import os from 'node:os'
 import path from 'node:path'
-import { DEFAULT_RUNTIME_POLICY, PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, deriveDecision, discoverRunners, executeRunner, makePlan, normalizeRuntimePolicy, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateFanoutEvidence, validateSynthesis } from './review-graph.mjs'
+import { DEFAULT_RUNTIME_POLICY, PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, deriveDecision, discoverRunners, executeRunner, makePlan, nativeSynthesisPrompt, normalizeRuntimePolicy, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateFanoutEvidence, validateNativeSynthesis, validateSynthesis } from './review-graph.mjs'
 import { buildReportDocument } from './lib/report.mjs'
 
 assert.deepEqual(parseArgs(['run', '--max-workers', '3', '--dry-run']), { command: 'run', maxWorkers: '3', dryRun: true })
+assert.deepEqual(parseArgs(['synthesize', '--run-dir', '/tmp/run', '--portable-cli']), { command: 'synthesize', runDir: '/tmp/run', portableCli: true })
+await assert.rejects(runGraph({ command: 'plan', runner: 'codex' }), /explicit portable CLI path/)
 assert.deepEqual(parseArgs(['run', '--run-timeout-seconds', '1800', '--node-timeout-seconds', '480', '--synthesis-timeout-seconds', '240', '--max-attempts', '2']), {
   command: 'run',
   runTimeoutSeconds: '1800',
@@ -79,6 +81,9 @@ const gateCandidate = { persona: 'rollout-gates', coverage: coverageFor('rollout
 assert.equal(validateCandidate(gateCandidate, 'rollout-gates'), gateCandidate)
 assert.throws(() => validateCandidate({ ...gateCandidate, gateRequirement: undefined }, 'rollout-gates'), /gateRequirement/)
 assert.equal(validateSynthesis({ blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'No verified findings' }).verdict, 'passable')
+assert.equal(validateNativeSynthesis({ h0: 'head-1', agentId: 'native-synthesis-1', synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'No verified findings' } }, 'head-1').agentId, 'native-synthesis-1')
+assert.throws(() => validateNativeSynthesis({ h0: 'wrong', agentId: 'native-synthesis-1', synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'No verified findings' } }, 'head-1'), /H0/)
+assert.ok(nativeSynthesisPrompt({ h0: 'head-1', changedFiles: ['src/a.ts'] }, '/tmp/native-run', ['correctness-platform'], { status: 'not-run' }).includes('built-in native synthesis subagent'))
 const routineFollowUp = validateSynthesis({ blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Owner checklist', summary: 'Human follow-up only', affectsVerdict: false, verdictImpact: 'none' }], verdict: 'passable', rationale: 'Code is sound' })
 assert.equal(routineFollowUp.verdict, 'passable')
 const contradictedBlocked = validateSynthesis({ blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [], verdict: 'blocked', rationale: 'Model supplied a contradictory verdict' })
@@ -282,6 +287,112 @@ try {
   git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'change')
   const head = git('rev-parse', 'HEAD')
   fs.writeFileSync(fresh, JSON.stringify({ revision: head, result: 'PASS' }))
+  const nativePlanDir = path.join(temp, 'native-plan')
+  const nativePlan = await runGraph(
+    { command: 'plan', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: nativePlanDir },
+    { discoverRunners: () => { throw new Error('plan must not discover external model CLIs') } },
+  )
+  assert.equal(nativePlan.audit.status, 'dry-run')
+  assert.ok(nativePlan.plan.routes.every((entry) => entry.route === null), 'native plan must expose no external routes')
+  assert.ok(nativePlan.commands.every((entry) => entry.command === null), 'native plan must emit no external CLI commands')
+  assert.ok(fs.existsSync(path.join(nativePlanDir, 'prompts', 'synthesis.txt')), 'native plan must emit a built-in synthesis prompt')
+  assert.ok(fs.readFileSync(path.join(nativePlanDir, 'prompts', 'synthesis.txt'), 'utf8').includes('do not invoke cursor-agent, claude, codex'))
+  const planBytesBeforeNativeSynthesis = fs.readFileSync(path.join(nativePlanDir, 'plan.json'))
+  const nativeBase = Date.now()
+  for (const persona of nativePlan.plan.personas) {
+    writeJsonForTest(path.join(nativePlanDir, 'nodes', `${persona}.json`), {
+      persona,
+      coverage: coverageFor(persona),
+      ...(persona === 'rollout-gates' ? { gateRequirement: { status: 'not-required', rationale: 'No independently releasable behavior', evidence: ['Button.tsx:1'], keys: [] } } : {}),
+      findings: [],
+    })
+  }
+  writeJsonForTest(path.join(nativePlanDir, 'fanout.json'), {
+    version: 1,
+    mode: 'native-subagent',
+    h0: head,
+    agents: nativePlan.plan.personas.map((persona, index) => ({
+      agentId: `native-reviewer-${index}`,
+      parentAgentId: null,
+      persona,
+      role: 'reviewer',
+      depth: 1,
+      startedAt: new Date(nativeBase + index * 10).toISOString(),
+      finishedAt: new Date(nativeBase + 1000 + index * 10).toISOString(),
+      status: 'ok',
+    })),
+  })
+  writeJsonForTest(path.join(nativePlanDir, 'candidates.json'), [{ title: 'stale candidate must be discarded' }])
+  const nativeSynthesisFile = path.join(nativePlanDir, 'native-synthesis.json')
+  writeJsonForTest(nativeSynthesisFile, {
+    h0: head,
+    agentId: 'native-synthesis-1',
+    synthesis: {
+      blocking: [],
+      nonBlocking: [],
+      unverified: [],
+      operationalFollowUps: [],
+      verdict: 'passable',
+      rationale: 'Native reviewers found no verified defects.',
+    },
+  })
+  const nativeResult = await runGraph(
+    { command: 'synthesize', runDir: nativePlanDir, nativeSynthesis: nativeSynthesisFile },
+    {
+      discoverRunners: () => { throw new Error('native synthesis must not discover external model CLIs') },
+      execute: () => { throw new Error('native synthesis must not execute an external model CLI') },
+    },
+  )
+  assert.equal(nativeResult.synthesis.decision, 'ACCEPT')
+  assert.equal(nativeResult.audit.synthesis.route, 'native-subagent:native-synthesis-1')
+  assert.deepEqual(nativeResult.audit.routes, [])
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(nativePlanDir, 'candidates.json'))), [], 'native synthesis must rebuild candidates from validated node files')
+  assert.deepEqual(fs.readFileSync(path.join(nativePlanDir, 'plan.json')), planBytesBeforeNativeSynthesis, 'native synthesis must preserve the frozen plan bytes')
+
+  const shimDir = path.join(temp, 'model-cli-shims')
+  fs.mkdirSync(shimDir)
+  const cliMarkers = []
+  for (const command of ['cursor-agent', 'claude', 'codex']) {
+    const marker = path.join(temp, `${command}-invoked`)
+    cliMarkers.push(marker)
+    fs.writeFileSync(path.join(shimDir, command), `#!/bin/sh\nprintf invoked > '${marker}'\nexit 97\n`)
+    fs.chmodSync(path.join(shimDir, command), 0o755)
+  }
+  const nativeEnv = { ...process.env, PATH: `${shimDir}:${process.env.PATH}` }
+  const blackBoxPlan = spawnSync(process.execPath, [
+    path.resolve('skills/fe-pr-review/scripts/review-graph.mjs'),
+    'plan',
+    '--repo-root', repo,
+    '--base', 'HEAD^',
+    '--head', 'HEAD',
+    '--output', path.join(temp, 'black-box-native-plan'),
+  ], { encoding: 'utf8', env: nativeEnv })
+  assert.equal(blackBoxPlan.status, 0, blackBoxPlan.stderr)
+  const blackBoxSynthesis = spawnSync(process.execPath, [
+    path.resolve('skills/fe-pr-review/scripts/review-graph.mjs'),
+    'synthesize',
+    '--run-dir', nativePlanDir,
+    '--native-synthesis', nativeSynthesisFile,
+  ], { encoding: 'utf8', env: nativeEnv })
+  assert.equal(blackBoxSynthesis.status, 0, blackBoxSynthesis.stderr)
+  assert.ok(cliMarkers.every((marker) => !fs.existsSync(marker)), 'native plan and synthesis must not invoke Cursor, Claude, or Codex CLI executables')
+
+  const missingNativeDir = path.join(temp, 'missing-native-synthesis')
+  fs.cpSync(nativePlanDir, missingNativeDir, { recursive: true })
+  fs.rmSync(path.join(missingNativeDir, 'native-synthesis.json'))
+  fs.rmSync(path.join(missingNativeDir, 'audit.json'))
+  const missingNative = await runGraph(
+    { command: 'synthesize', runDir: missingNativeDir },
+    {
+      discoverRunners: () => { throw new Error('missing native synthesis must not discover external model CLIs') },
+      execute: () => { throw new Error('missing native synthesis must not execute an external model CLI') },
+    },
+  )
+  assert.equal(missingNative.synthesis.decision, 'REJECT')
+  assert.ok(missingNative.synthesis.reasonCodes.includes('SYNTHESIS_FAILED'))
+  assert.equal(missingNative.audit.synthesis.attempts.length, 0)
+  assert.ok(missingNative.synthesis.unverified[0].summary.includes('No external CLI fallback was attempted'))
+
   const dry = await runGraph({ command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'dry-run'), dryRun: true }, { routes: [] })
   assert.equal(dry.audit.status, 'dry-run')
   assert.ok(dry.plan.routes.every((entry) => entry.route === null), 'dry-run must work without a provider')

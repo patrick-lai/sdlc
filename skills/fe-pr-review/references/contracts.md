@@ -17,11 +17,13 @@ Every admitted PR must end in one of these batch states:
 
 A PR deadline covers admission, snapshot, learned-knowledge recall, fan-out, synthesis, coordinator verification, fresh `H0` check, report rendering, upload, and reachability verification. Stop work that cannot fit the remaining time.
 
-Use 3-6 persona reviewers and never more than six. Native fan-out is preferred. At least two top-level persona reviewers must materially overlap in wall-clock time. `fanout.json` records actual IDs, parents, depth, persona, timestamps, status, and derived concurrency. The coordinator derives overlap from timestamps rather than trusting a claimed count.
+Use 3-6 persona reviewers and never more than six. When native subagents are available, parent-owned native fan-out is mandatory. At least two top-level persona reviewers must materially overlap in wall-clock time. `fanout.json` records actual IDs, parents, depth, persona, timestamps, status, and derived concurrency. The coordinator derives overlap from timestamps rather than trusting a claimed count.
 
 Top-level persona reviewers run at depth 1. Each may optionally create at most two focused probe children at depth 2. A child covers one narrow question, returns compact evidence to its parent, and cannot delegate. Depth 3, more than two children per reviewer, duplicate full-persona children, or children outside the parent interval invalidate fan-out evidence.
 
-Portable CLI fallback disables child delegation and uses:
+The parent launches one built-in native synthesis subagent after reviewer fan-out and saves its H0-bound result to `native-synthesis.json`. Native `plan` and `synthesize` perform no external model discovery or execution. They never invoke `cursor-agent`, `claude`, or `codex`.
+
+Portable CLI fallback is allowed only by explicit user request. It disables child delegation and uses:
 
 ```text
 --max-workers 4
@@ -32,7 +34,7 @@ Portable CLI fallback disables child delegation and uses:
 --run-timeout-seconds 1500
 ```
 
-Permit at most two attempts per node across provider kinds. Do not retry every provider. Authentication, capacity, configuration, or timeout failure opens a circuit for that provider kind for the rest of the PR run.
+Portable mode permits at most two attempts per node across provider kinds. Do not retry every provider. Authentication, capacity, configuration, or timeout failure opens a circuit for that provider kind for the rest of the PR run. A native node failure does not authorize portable fallback.
 
 ## Reviewer coverage and findings
 
@@ -72,7 +74,7 @@ Do not run broad builds or test suites. Run only focused blessed checks needed f
 
 ## Runner safety
 
-Adapters run installed CLIs non-interactively and read-only. Unsafe permission bypass, write modes, shell fragments, and mutation-capable flags are refused. Prompts never run through a shell.
+The default Codex path uses built-in subagents owned by the parent agent. It does not launch model CLIs. Explicit portable adapters run installed CLIs non-interactively and read-only. Unsafe permission bypass, write modes, shell fragments, and mutation-capable flags are refused. Prompts never run through a shell.
 
 ## Filesystem safety
 

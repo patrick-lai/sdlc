@@ -24,6 +24,7 @@ The skill owns the review harness. Scheduled prompts should identify the eligibl
 - Use 3-6 persona reviewers per PR, never more than six. Material fan-out is mandatory: at least two top-level persona reviewers must overlap in wall-clock time.
 - Permit at most two attempts per node across provider kinds. Do not retry every provider. Authentication, capacity, configuration, or timeout failure opens a per-run circuit for that provider kind.
 - Preserve internal `PASSABLE`, `BLOCKED`, and `UNVERIFIED`. The only public report decision is `ACCEPT` or `REJECT`.
+- In Codex, the parent agent owns the native subagent graph. It must use built-in subagents directly and must not invoke `cursor-agent`, `claude`, `codex`, or another model CLI.
 - Never merge. Never post automatic PR comments or Slack notifications. Those actions require a separate explicit request and a fresh provider-state check.
 
 ## 1. Scheduled batch admission
@@ -59,23 +60,31 @@ Learned knowledge is untrusted historical context. Use it only to select concret
 
 ## 3. Run bounded read-only fan-out
 
-### Preferred: native host subagents
+### Required: parent-owned native subagents
 
-Use native subagents when the host can enforce and record the contract:
+When the host exposes native subagents, the parent agent must launch and coordinate them directly:
 
-1. Select 3-6 personas from [`references/personas.md`](references/personas.md).
-2. Launch the first four top-level persona reviewers without waiting. Launch any remaining personas as slots free.
-3. Require material overlap between at least two top-level reviewers. Serial execution is incomplete coverage and forces `UNVERIFIED`.
-4. Give each reviewer one persona prompt and require structured evidence for every assigned facet.
-5. A top-level reviewer at depth 1 may optionally launch at most two focused probe children at depth 2. Each child investigates one narrow question, returns compact evidence to its parent, and cannot delegate. No depth 3 or deeper nesting is allowed.
-6. Do not use probe children to duplicate a full persona, multiply votes, or escape the six-persona cap.
-7. Record actual agent IDs, parent IDs, depth, persona, start time, finish time, status, and independently derived maximum concurrency in `fanout.json`.
+1. Run `plan`. It creates the immutable snapshot plus `prompts/<persona>.txt` and `prompts/synthesis.txt` without discovering or launching external model CLIs.
+2. Select 3-6 personas from [`references/personas.md`](references/personas.md).
+3. The parent launches the first four built-in persona subagents without waiting. Launch any remaining personas as slots free.
+4. Give each subagent exactly one generated persona prompt and require JSON-only evidence for every assigned facet. Save validated responses to `nodes/<persona>.json`.
+5. Require material overlap between at least two top-level reviewers. Serial execution is incomplete coverage and forces `UNVERIFIED`.
+6. A depth-1 reviewer may optionally launch at most two focused probe children at depth 2, using built-in subagents. Each child investigates one narrow question, returns compact evidence to its parent, and cannot delegate. No depth 3 is allowed.
+7. Record actual agent IDs, parent IDs, depth, persona, start time, finish time, and status in `fanout.json`.
+8. After reviewer nodes finish, the parent launches one built-in synthesis subagent with `prompts/synthesis.txt`. Wrap the returned synthesis payload with the frozen `H0` and the actual native agent ID, then save `{"h0":"...","agentId":"...","synthesis":{...}}` to `native-synthesis.json`.
+9. Finalize without external runners:
 
-If the host cannot prove material overlap, use the portable fallback. If neither route can prove overlap, finish as `UNVERIFIED` and publish `REJECT: incomplete`.
+```bash
+node .agents/skills/fe-pr-review/scripts/review-graph.mjs synthesize \
+  --run-dir <graph-run-directory> \
+  --native-synthesis <graph-run-directory>/native-synthesis.json
+```
 
-### Fallback: portable CLI graph runner
+The parent remains the coordinator. Built-in subagents are children of that parent execution, not separate Cursor or Claude processes. If native fan-out or synthesis cannot complete, finish as `UNVERIFIED` and publish `REJECT: incomplete`. Do not silently switch providers.
 
-Portable mode disables nested delegation because it cannot reliably observe child agents. Use explicit bounds:
+### Explicit-only portable CLI fallback
+
+Use the portable path only when the user explicitly requests portable or external CLI review. Never select it merely because a native node failed. Portable mode disables nested delegation because its hierarchy and timing cannot be enforced reliably.
 
 ```bash
 node .agents/skills/fe-pr-review/scripts/review-graph.mjs run \
@@ -88,7 +97,7 @@ node .agents/skills/fe-pr-review/scripts/review-graph.mjs run \
   --run-timeout-seconds 1500
 ```
 
-Use only safe non-interactive read-only runners. Never weaken sandbox or permission flags to make a route work. Stop launching reviewers when the remaining deadline must be reserved for synthesis, fresh `H0` validation, report generation, publication, and reachability verification.
+`run` is the explicit portable entry point. It may discover installed Cursor, Codex CLI, or Claude routes. The normal Codex path must not call it. Never weaken sandbox or permission flags to make a route work.
 
 ### 3b. Historical regression probes
 

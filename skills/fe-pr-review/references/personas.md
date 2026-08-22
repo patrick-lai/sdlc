@@ -20,7 +20,7 @@ Frontend source or stories usually add `accessibility-ui` and `rollout-gates`. F
 
 ## Native fan-out contract
 
-Launch the first four selected persona reviewers concurrently. Launch remaining personas as slots free. At least two top-level reviewers must show material overlap in recorded timestamps. Agreement is not evidence.
+The Codex parent agent launches the first four selected built-in persona subagents concurrently. Launch remaining personas as slots free. At least two top-level reviewers must show material overlap in recorded timestamps. Agreement is not evidence. Do not invoke Cursor, Claude, Codex CLI, or another external model process for the native graph.
 
 Top-level reviewers are depth 1. Each may optionally launch no more than two focused probe children at depth 2:
 
@@ -33,7 +33,7 @@ Top-level reviewers are depth 1. Each may optionally launch no more than two foc
 
 Probe children are useful for focused caller tracing, contract lookup, or test-oracle inspection. They are not a mechanism for an unbounded nested army.
 
-Portable CLI mode uses the same personas but disables probe children because their hierarchy and timing cannot be enforced reliably.
+Portable CLI mode is explicit user opt-in only. It uses the same personas but disables probe children because their hierarchy and timing cannot be enforced reliably.
 
 ## Historical regression probes
 

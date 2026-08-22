@@ -175,6 +175,10 @@ for (const marker of [
   'Historical regression probes',
   'fail-fast',
   'pre-fix',
+  'parent agent owns the native subagent graph',
+  'must not invoke `cursor-agent`, `claude`, `codex`',
+  'native-synthesis.json',
+  'only when the user explicitly requests portable or external CLI review',
 ]) {
   assert.ok(feReview.includes(marker), `fe-pr-review missing public contract: ${marker}`)
 }
@@ -208,6 +212,9 @@ for (const marker of [
   'Filesystem safety',
   'Historical regression evidence',
   'pre-fix behavior',
+  'parent-owned native fan-out is mandatory',
+  'Native `plan` and `synthesize` perform no external model discovery or execution',
+  'Portable CLI fallback is allowed only by explicit user request',
 ]) {
   assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing: ${marker}`)
 }
@@ -221,7 +228,7 @@ for (const id of personaIds) assert.ok(fePersonas.includes(id), `personas refere
 for (const marker of [
   '3-6 personas per PR',
   'no more than six',
-  'Launch the first four selected persona reviewers concurrently',
+  'parent agent launches the first four selected built-in persona subagents concurrently',
   'material overlap',
   'two focused probe children at depth 2',
   'no depth 3',
@@ -233,6 +240,7 @@ for (const marker of [
   'temporal history or cache behavior',
   'side-effect liveness',
   'test-oracle validity',
+  'Portable CLI mode is explicit user opt-in only',
 ]) {
   assert.ok(fePersonas.includes(marker), `personas reference missing historical probe marker: ${marker}`)
 }
@@ -321,6 +329,9 @@ for (const marker of [
   'Do not run broad builds or test suites',
   'retry every provider',
   'Automatic PR comments and Slack notifications are outside scheduled review',
+  'parent agent owns the review graph and launches built-in subagents directly',
+  'never substitutes Cursor, Claude, Codex CLI',
+  'unless the user explicitly requests portable CLI review',
 ]) assert.ok(review.includes(marker), `review missing unified routing contract: ${marker}`)
 
 const blockerComment = fs.readFileSync(path.join(root, 'skills/review/references/blocking-pr-comment.md'), 'utf8')
