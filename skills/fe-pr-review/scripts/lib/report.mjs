@@ -23,6 +23,15 @@ const STATUS_META = {
   unverified: { label: 'Unverified', tone: 'unverified' },
 }
 
+const DECISION_REASON = {
+  VERIFIED_FINDING: 'VERIFIED_FINDING',
+  INSUFFICIENT_EVIDENCE: 'INSUFFICIENT_EVIDENCE',
+  QA_FAILURE: 'QA_FAILURE',
+  RUNNER_FAILURE: 'RUNNER_FAILURE',
+  FANOUT_FAILURE: 'FANOUT_FAILURE',
+  RUNTIME_FAILURE: 'RUNTIME_FAILURE',
+}
+
 function shortRef(value, n = 8) {
   const text = String(value ?? '')
   return text.length <= n ? text : `${text.slice(0, n)}…`
@@ -48,35 +57,154 @@ function findingId(group, finding, index, used) {
   return id
 }
 
-function buildExecutiveSummary({ verdict, counts, qa, featureGate, findings, failedNodes }) {
+function lower(value) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+function failedStatus(value) {
+  return ['failed', 'failure', 'error', 'invalid', 'timeout', 'timed-out', 'blocked'].includes(lower(value))
+}
+
+function runnerFailure({ failedNodes, metadata, audit }) {
+  if (failedNodes.length > 0) return true
+  const runner = metadata?.runner
+  if (runner?.failed === true || failedStatus(runner?.status)) return true
+  if (Array.isArray(audit?.nodes) && audit.nodes.some((node) => node?.status !== 'ok')) return true
+  return failedStatus(audit?.synthesis?.status)
+}
+
+function fanoutFailure({ metadata, fanout }) {
+  const value = fanout || metadata?.fanout
+  if (!value) return false
+  if (value.valid === false || value.materialOverlap === false || failedStatus(value.status)) return true
+  const concurrency = Number(value.maxObservedConcurrency)
+  return Number.isFinite(concurrency) && concurrency < 2
+}
+
+function runtimeFailure({ metadata, runtime, audit }) {
+  const values = [runtime, metadata?.runtime, audit?.runtime].filter(Boolean)
+  if (audit?.timedOut === true || audit?.deadlineExceeded === true) return true
+  return values.some(
+    (value) =>
+      value.timedOut === true ||
+      value.deadlineExceeded === true ||
+      ['timeout', 'timed-out', 'deadline-exceeded', 'runtime-failure'].includes(lower(value.status)),
+  )
+}
+
+export function derivePublicDecision({
+  verdict,
+  qa,
+  counts,
+  failedNodes = [],
+  metadata,
+  audit,
+  fanout,
+  runtime,
+}) {
+  const reasonCodes = []
+  const internalVerdict = lower(verdict?.value || verdict)
+  const qaStatus = lower(qa?.status || 'not-run')
+  const qaResult = lower(qa?.result)
+  const qaAllowed = qaStatus === 'not-run' || (qaStatus === 'fresh' && qaResult === 'pass')
+
+  if (internalVerdict === 'blocked' || counts.blocking > 0) {
+    reasonCodes.push(DECISION_REASON.VERIFIED_FINDING)
+  }
+  if (
+    internalVerdict === 'unverified' ||
+    !['passable', 'blocked', 'unverified'].includes(internalVerdict) ||
+    counts.unverifiedFindings > 0 ||
+    counts.facetsUnverified > 0
+  ) {
+    reasonCodes.push(DECISION_REASON.INSUFFICIENT_EVIDENCE)
+  }
+  if (!qaAllowed) {
+    reasonCodes.push(
+      qaStatus === 'fresh' || failedStatus(qaStatus)
+        ? DECISION_REASON.QA_FAILURE
+        : DECISION_REASON.INSUFFICIENT_EVIDENCE,
+    )
+  }
+  if (runnerFailure({ failedNodes, metadata, audit })) {
+    reasonCodes.push(DECISION_REASON.RUNNER_FAILURE)
+  }
+  if (fanoutFailure({ metadata, fanout })) {
+    reasonCodes.push(DECISION_REASON.FANOUT_FAILURE)
+  }
+  if (runtimeFailure({ metadata, runtime, audit })) {
+    reasonCodes.push(DECISION_REASON.RUNTIME_FAILURE)
+  }
+
+  const uniqueReasonCodes = [...new Set(reasonCodes)]
+  const accepted = internalVerdict === 'passable' && qaAllowed && uniqueReasonCodes.length === 0
+  const value = accepted ? 'ACCEPT' : 'REJECT'
+
+  return {
+    value,
+    label: accepted ? 'Accept' : 'Reject',
+    tone: accepted ? 'passable' : 'blocked',
+    reasonCodes: uniqueReasonCodes,
+    rationale: accepted
+      ? 'The code verdict is passable and supplied QA evidence is acceptable.'
+      : 'This revision is not eligible for automated acceptance. Review the reason codes and internal diagnostics.',
+  }
+}
+
+function normalizePublicDecision(synthesis, fallback) {
+  const value = String(synthesis?.decision || '').toUpperCase()
+  if (!['ACCEPT', 'REJECT'].includes(value)) return fallback
+  const reasonCodes = Array.isArray(synthesis?.reasonCodes)
+    ? [...new Set(synthesis.reasonCodes.map((code) => String(code)).filter(Boolean))]
+    : fallback.reasonCodes
+  return {
+    value,
+    label: value === 'ACCEPT' ? 'Accept' : 'Reject',
+    tone: value === 'ACCEPT' ? 'passable' : 'blocked',
+    reasonCodes,
+    rationale:
+      value === 'ACCEPT'
+        ? 'The bounded review completed with sufficient evidence for automated acceptance.'
+        : 'This revision is not eligible for automated acceptance. Review the reason codes and internal diagnostics.',
+  }
+}
+
+function buildExecutiveSummary({ decision, verdict, counts, qa, featureGate, findings, failedNodes }) {
   const blocking = findings.filter((f) => f.group === 'blocking')
   const qaOutcome = qa.status === 'fresh' ? String(qa.result || '').toUpperCase() : ''
   const qaBlocksApproval = qa.status === 'fresh' && ['FAIL', 'PARTIAL', 'BLOCKED'].includes(qaOutcome)
+  const reasons = new Set(decision.reasonCodes)
 
   const headline =
-    verdict.value === 'blocked'
-      ? 'Not ready to merge — fix blocking issues first.'
-      : verdict.value === 'passable'
-        ? 'No blocking issues — scan notes below before approving.'
-        : 'Incomplete review — do not treat this as a clean pass.'
+    decision.value === 'ACCEPT'
+      ? 'Accepted by the automated review.'
+      : reasons.has(DECISION_REASON.VERIFIED_FINDING)
+        ? 'Rejected because verified blocking findings need attention.'
+        : reasons.has(DECISION_REASON.QA_FAILURE)
+          ? 'Rejected because supplied QA evidence did not pass.'
+          : reasons.has(DECISION_REASON.RUNNER_FAILURE) ||
+              reasons.has(DECISION_REASON.FANOUT_FAILURE) ||
+              reasons.has(DECISION_REASON.RUNTIME_FAILURE)
+            ? 'Rejected because the automated review did not complete reliably.'
+            : 'Rejected because evidence is incomplete.'
 
-  const decision =
-    verdict.value === 'blocked'
-      ? 'Do not merge yet.'
-      : qaBlocksApproval
-        ? 'Investigate visual QA before approving.'
-        : verdict.value === 'passable'
-          ? 'Looks mergeable after a quick scan.'
-          : 'Incomplete review — do not treat this as a pass.'
+  const mergeAdvice =
+    decision.value === 'ACCEPT'
+      ? 'This revision looks mergeable and is accepted by the automated review.'
+      : reasons.has(DECISION_REASON.VERIFIED_FINDING)
+        ? 'Do not merge until the blocking findings are fixed.'
+        : qaBlocksApproval
+          ? 'Investigate visual QA before approving.'
+          : 'Do not treat this automated review as approval.'
 
   const nextStep =
-    verdict.value === 'blocked'
-      ? 'Open each blocking finding, then confirm the suggested fix.'
-      : qaBlocksApproval
-        ? 'Open the QA section and resolve the FAIL, PARTIAL, or BLOCKED result first.'
-        : verdict.value === 'passable'
-          ? 'Scan notes and QA, then you can approve.'
-          : 'Read limitations and failed coverage before deciding.'
+    decision.value === 'ACCEPT'
+      ? 'Scan the internal verdict and supporting evidence before you approve.'
+      : reasons.has(DECISION_REASON.VERIFIED_FINDING)
+        ? 'Open each blocking finding, then confirm the suggested fix.'
+        : qaBlocksApproval
+          ? 'Open the QA section and resolve the failed or incomplete result first.'
+          : 'Read the reason codes, limitations, and failed coverage before deciding.'
 
   const bullets = []
   bullets.push(
@@ -121,7 +249,7 @@ function buildExecutiveSummary({ verdict, counts, qa, featureGate, findings, fai
     anchor: `finding-${finding.id}`,
   }))
 
-  return { headline, bullets, actions, rationale: verdict.rationale, decision, nextStep }
+  return { headline, bullets, actions, rationale: verdict.rationale, decision: mergeAdvice, nextStep }
 }
 
 function linkifyEvidence(text) {
@@ -180,6 +308,10 @@ export function buildReportDocument({
   generatedAt,
   coverage,
   featureGate,
+  metadata,
+  audit,
+  fanout,
+  runtime,
 }) {
   const gate =
     featureGate ||
@@ -255,7 +387,19 @@ export function buildReportDocument({
     personas: selected.length,
     failedNodes: failedNodes.length,
   }
+  const derivedDecision = derivePublicDecision({
+    verdict,
+    qa: qaDoc,
+    counts,
+    failedNodes,
+    metadata,
+    audit,
+    fanout,
+    runtime,
+  })
+  const decision = normalizePublicDecision(synthesis, derivedDecision)
   const executive = buildExecutiveSummary({
+    decision,
     verdict,
     counts,
     qa: qaDoc,
@@ -277,6 +421,7 @@ export function buildReportDocument({
       shortBase: shortRef(snapshot.base, 10),
       shortDiff: shortRef(snapshot.diffHash, 12),
     },
+    decision,
     verdict,
     executive,
     qa: qaDoc,
@@ -310,10 +455,12 @@ export function buildReviewMarkdown(document) {
   const lines = [
     '# Frontend PR Review Evidence',
     '',
+    `- **Decision:** **${d.decision.value}**`,
+    `- **Code verdict:** **${String(d.verdict.value).toUpperCase()}**`,
+    `- **Reason codes:** ${d.decision.reasonCodes.length ? d.decision.reasonCodes.map((code) => `\`${code}\``).join(', ') : 'none'}`,
     `- **Head:** \`${d.snapshot.h0}\``,
     `- **Base:** \`${d.snapshot.base}\``,
     `- **Diff SHA-256:** \`${d.snapshot.diffHash}\``,
-    `- **Verdict:** **${String(d.verdict.value).toUpperCase()}**`,
     `- **QA:** **${String(d.qa.status).toUpperCase()}**`,
     '',
     '## Feature-gate decision',
@@ -439,6 +586,7 @@ export function buildReviewReport(input) {
   return {
     version: 1,
     h0: input.snapshot.h0,
+    decision: document.decision,
     verdict: input.synthesis?.verdict || 'unverified',
     featureGate: document.featureGate,
     coverage,

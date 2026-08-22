@@ -1782,10 +1782,10 @@
     <section class="verdict" id="verdict" data-tone="unverified">
       <div class="verdict-inner">
         <div>
-          <h1 id="verdict-title">Unverified</h1>
-          <p id="verdict-rationale">Loading report…</p>
+          <h1 id="verdict-title">Reject</h1>
+          <p id="verdict-rationale">Loading report...</p>
         </div>
-        <div class="verdict-chip" id="verdict-chip">Advice only</div>
+        <div class="verdict-chip" id="verdict-chip">Reject</div>
       </div>
     </section>
 
@@ -1821,6 +1821,13 @@
         } catch {
           data = {
             schema: 'sdlc.fe-pr-review.report/v1',
+            decision: {
+              value: 'REJECT',
+              label: 'Reject',
+              tone: 'blocked',
+              reasonCodes: ['INSUFFICIENT_EVIDENCE'],
+              rationale: 'Invalid report payload.',
+            },
             verdict: { value: 'unverified', label: 'Unverified', tone: 'unverified', rationale: 'Invalid report payload.' },
             counts: { blocking: 0, nonBlocking: 0, unverifiedFindings: 0, facets: 0, facetsUnverified: 0 },
             findings: [],
@@ -1853,10 +1860,12 @@
         document.getElementById('brand-meta').textContent =
           formatWhen(data.generatedAt) + ' · H0 ' + (data.snapshot?.shortH0 || 'unknown')
 
+        const publicDecision = data.decision?.value === 'ACCEPT' ? 'Accept' : 'Reject'
         const verdictEl = document.getElementById('verdict')
-        verdictEl.dataset.tone = data.verdict?.tone || data.verdict?.value || 'unverified'
-        document.getElementById('verdict-title').textContent = data.verdict?.label || titleCase(data.verdict?.value)
-        document.getElementById('verdict-rationale').textContent = data.executive?.headline || data.verdict?.rationale || ''
+        verdictEl.dataset.tone = publicDecision === 'Accept' ? 'passable' : 'blocked'
+        document.getElementById('verdict-title').textContent = publicDecision
+        document.getElementById('verdict-rationale').textContent =
+          data.executive?.headline || data.decision?.rationale || ''
 
         const readPath = [
           { id: 'summary', step: '1', title: 'What happened', hint: 'Verdict and what to do next' },
@@ -1875,8 +1884,7 @@
         renderJumpNav()
         renderTopJump()
 
-        document.getElementById('verdict-chip').textContent =
-          (data.verdict?.value || 'unverified') + ' · advice only'
+        document.getElementById('verdict-chip').textContent = publicDecision
 
         app.appendChild(renderGuide())
         app.appendChild(renderExecutive(data))
@@ -1956,7 +1964,7 @@
 
         function renderExecutive(data) {
           const section = sectionShell('summary', '1 · Executive summary', 'Start here. This is the merge advice in plain language.')
-          const tone = data.verdict?.tone || data.verdict?.value || 'unverified'
+          const tone = data.decision?.tone || 'blocked'
           const exec = el('div', { class: 'exec', 'data-tone': tone }, [
             el('p', { class: 'exec-kicker' }, ['Start here']),
             el('h3', { class: 'exec-headline' }, [data.executive?.decision || data.executive?.headline || 'Review summary']),
@@ -2027,8 +2035,19 @@
           row.appendChild(metaChip('Base', data.snapshot?.base, 'base'))
           row.appendChild(metaChip('Diff SHA-256', data.snapshot?.diffHash, 'diff'))
           row.appendChild(
+            metaChip('Code verdict', String(data.verdict?.value || 'unverified').toUpperCase(), null, false),
+          )
+          row.appendChild(
             metaChip('QA', String(data.qa?.status || 'not-run').toUpperCase(), null, false),
           )
+          if (data.decision?.reasonCodes?.length) {
+            body.appendChild(
+              el('div', { class: 'gate-banner', style: 'margin-top:10px' }, [
+                el('strong', {}, ['Decision reason codes']),
+                el('p', { style: 'margin:0;color:var(--muted)' }, [data.decision.reasonCodes.join(' · ')]),
+              ]),
+            )
+          }
           body.appendChild(row)
           if (data.failedNodes?.length) {
             body.appendChild(

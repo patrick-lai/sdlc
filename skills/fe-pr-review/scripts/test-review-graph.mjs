@@ -2,13 +2,25 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import os from 'node:os'
 import path from 'node:path'
-import { PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, discoverRunners, makePlan, parseArgs, qaEvidence, qaForPrompt, runGraph, runtimePolicy, selectPersonas, shouldCircuitBreakProvider, validateCandidate, validateSynthesis } from './review-graph.mjs'
+import { DEFAULT_RUNTIME_POLICY, PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, deriveDecision, discoverRunners, executeRunner, makePlan, normalizeRuntimePolicy, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateFanoutEvidence, validateSynthesis } from './review-graph.mjs'
 import { buildReportDocument } from './lib/report.mjs'
 
 assert.deepEqual(parseArgs(['run', '--max-workers', '3', '--dry-run']), { command: 'run', maxWorkers: '3', dryRun: true })
-assert.deepEqual(parseArgs(['run', '--node-timeout-seconds', '60', '--max-attempts', '1']), { command: 'run', nodeTimeoutSeconds: '60', maxAttempts: '1' })
+assert.deepEqual(parseArgs(['run', '--run-timeout-seconds', '1800', '--node-timeout-seconds', '480', '--synthesis-timeout-seconds', '240', '--max-attempts', '2']), {
+  command: 'run',
+  runTimeoutSeconds: '1800',
+  nodeTimeoutSeconds: '480',
+  synthesisTimeoutSeconds: '240',
+  maxAttempts: '2',
+})
+assert.deepEqual(normalizeRuntimePolicy(), DEFAULT_RUNTIME_POLICY)
+assert.equal(normalizeRuntimePolicy({ maxAttempts: '9' }).maxAttemptsPerNode, 2)
+assert.equal(normalizeRuntimePolicy({ runTimeoutSeconds: '30', nodeTimeoutSeconds: '8', synthesisTimeoutSeconds: '4' }).synthesisReserveMs, 4000)
+assert.throws(() => normalizeRuntimePolicy({ maxAttempts: '1.5' }), /integer/)
 assert.deepEqual(selectPersonas(['src/server.ts']), ['repository-contract', 'correctness-platform', 'privacy-security-data'])
 assert.deepEqual(selectPersonas(['src/Button.tsx']), ['repository-contract', 'correctness-platform', 'privacy-security-data', 'accessibility-ui', 'rollout-gates', 'product-tests'])
 assert.throws(() => selectPersonas([], 'accessibility-ui'), /3-6/)
@@ -30,8 +42,8 @@ assert.ok(buildRunnerCommand(routes[3], '/tmp/repo').args.includes('--strict-mcp
 assert.ok(buildRunnerCommand(routes[3], '/tmp/repo').args.includes('{"mcpServers":{}}'))
 assert.equal(classifyRunnerFailure(new Error('monthly usage limit reached')), 'capacity')
 assert.equal(classifyRunnerFailure(new Error('Workspace Trust Required')), 'auth')
-assert.equal(shouldCircuitBreakProvider(new Error('Runner timed out after 100ms')), true)
-assert.equal(shouldCircuitBreakProvider(new Error('temporary network failure')), false)
+assert.equal(classifyRunnerFailure(new Error('Runner timed out after 10ms')), 'timeout')
+assert.equal(classifyRunnerFailure(new Error('Invalid persona result envelope')), 'invalid-output')
 for (const route of routes) assert.ok(!buildRunnerCommand(route, '/tmp/repo').args.some((arg) => /bypass|danger|yolo|force/.test(arg)))
 assert.throws(() => discoverRunners({ available: { cursor: true, codex: true, claude: true }, runner: 'shell' }), /--runner accepts/)
 assert.throws(() => discoverRunners({ available: { cursor: false, codex: true, claude: false }, model: 'evil; rm -rf /' }), /Unsafe model ID/)
@@ -56,7 +68,8 @@ assert.throws(() => assertOutsideRepo('/tmp/repo/run', '/tmp/repo'), /outside th
 assert.equal(assertOutsideRepo('/tmp/elsewhere/run', '/tmp/repo'), '/tmp/elsewhere/run')
 
 const coverageFor = (persona, status = 'checked') => PERSONA_FACETS[persona].map(([id]) => ({ id, status, summary: `Inspected ${id}`, evidence: [`src/example.ts:1 establishes ${id}`] }))
-const candidate = { persona: 'correctness-platform', coverage: coverageFor('correctness-platform'), findings: [{ title: 'Broken state', lens: 'correctness', file: 'src/a.ts', line: 7, trigger: 'Click save', reproduction: '1. Enter valid data. 2. Click save. 3. Observe the rejected write and lost data.', executionPath: ['save calls write', 'write rejects'], rootCause: 'The changed save path drops the rejection before persisting state.', violatedContract: 'Save must retain data', impact: 'User loses data', evidence: ['caller at src/b.ts:2'], severity: 'blocking', confidence: 0.91, disconfirmingReason: 'A caller may catch the rejection', suggestedFix: 'Handle the rejection', suggestedPatch: 'return write().catch(showSaveError)', verification: 'Exercise rejected write' }] }
+const writeJsonForTest = (file, value) => fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`)
+const candidate = { persona: 'correctness-platform', coverage: coverageFor('correctness-platform'), findings: [{ title: 'Broken state', lens: 'correctness', file: 'src/a.ts', line: 7, trigger: 'Click save', reproduction: 'Enter valid data, click save, and observe the rejected write and lost data.', executionPath: ['save calls write', 'write rejects'], rootCause: 'The changed save path drops the rejection before persisting state.', violatedContract: 'Save must retain data', impact: 'User loses data', evidence: ['caller at src/b.ts:2'], severity: 'blocking', confidence: 0.91, disconfirmingReason: 'A caller may catch the rejection', suggestedFix: 'Handle the rejection', suggestedPatch: 'return write().catch(showSaveError)', verification: 'Exercise rejected write' }] }
 assert.equal(validateCandidate(candidate, 'correctness-platform'), candidate)
 assert.throws(() => validateCandidate({ ...candidate, coverage: candidate.coverage.slice(1) }, 'correctness-platform'), /every facet/)
 assert.throws(() => validateCandidate({ ...candidate, findings: [{ ...candidate.findings[0], evidence: [] }] }, 'correctness-platform'), /evidence/)
@@ -92,37 +105,155 @@ assert.throws(() => validateSynthesis({ blocking: Array(6).fill({}), nonBlocking
 
 const plan = makePlan({ h0: 'a'.repeat(40), base: 'b'.repeat(40), diffHash: 'c'.repeat(64) }, selectPersonas(['x.tsx']), routes, 99)
 assert.equal(plan.maxWorkers, 6)
-assert.equal(makePlan({ h0: 'a', base: 'b', diffHash: 'c' }, selectPersonas(['x.tsx']), routes, 1).maxWorkers, 2, 'multi-persona reviews cannot be configured as serial')
 assert.equal(plan.graph.at(-1).id, 'synthesis')
-assert.equal(plan.prompts.length, 6)
-assert.ok(plan.prompts.every((entry) => entry.path.startsWith('prompts/') && entry.output.startsWith('nodes/')))
 assert.ok(!plan.graph.at(-1).dependsOn.includes('qa-demo'), 'qa-demo is opt-in and must not be a default synthesis dependency')
 assert.equal(plan.qa.status, 'not-run')
 const optedInPlan = makePlan({ h0: 'a'.repeat(40), base: 'b'.repeat(40), diffHash: 'c'.repeat(64) }, selectPersonas(['x.tsx']), routes, 4, true)
 assert.ok(optedInPlan.graph.at(-1).dependsOn.includes('qa-demo'))
 assert.equal(plan.routes.length, 6)
-assert.deepEqual(runtimePolicy(), { nodeTimeoutSeconds: 480, synthesisTimeoutSeconds: 300, runTimeoutSeconds: 1200, maxAttempts: 2 })
-assert.deepEqual(runtimePolicy({ nodeTimeoutSeconds: 0, synthesisTimeoutSeconds: 999999, runTimeoutSeconds: 1, maxAttempts: 99 }), { nodeTimeoutSeconds: 1, synthesisTimeoutSeconds: 1800, runTimeoutSeconds: 2, maxAttempts: 3 })
+assert.equal(plan.runtimePolicy.runTimeoutMs, 25 * 60 * 1000)
+assert.equal(plan.runtimePolicy.nodeTimeoutMs, 8 * 60 * 1000)
+assert.equal(plan.runtimePolicy.synthesisTimeoutMs, 4 * 60 * 1000)
+
+const fanoutPersonas = selectPersonas(['src/server.ts'])
+const overlappingFanout = {
+  version: 1,
+  mode: 'native-subagent',
+  h0: 'head-1',
+  agents: fanoutPersonas.map((persona, index) => ({
+    agentId: `agent-${index}`,
+    parentAgentId: null,
+    persona,
+    role: 'reviewer',
+    depth: 1,
+    startedAt: new Date(index * 10).toISOString(),
+    finishedAt: new Date(100 + index * 10).toISOString(),
+    status: 'ok',
+  })),
+}
+const validFanout = validateFanoutEvidence(overlappingFanout, fanoutPersonas, 'head-1')
+assert.equal(validFanout.valid, true)
+assert.equal(validFanout.materialOverlap, true)
+assert.equal(validFanout.maxObservedConcurrency, 3)
+const serialFanout = {
+  ...overlappingFanout,
+  agents: fanoutPersonas.map((persona, index) => ({
+    ...overlappingFanout.agents[index],
+    startedAt: new Date(index * 100).toISOString(),
+    finishedAt: new Date(index * 100 + 50).toISOString(),
+  })),
+}
+assert.equal(validateFanoutEvidence(serialFanout, fanoutPersonas, 'head-1').valid, false)
+assert.ok(validateFanoutEvidence(serialFanout, fanoutPersonas, 'head-1').errors.includes('FANOUT_NO_MATERIAL_OVERLAP'))
+assert.equal(validateFanoutEvidence({ ...overlappingFanout, h0: 'wrong' }, fanoutPersonas, 'head-1').valid, false)
+const failedReviewerFanout = {
+  ...overlappingFanout,
+  agents: overlappingFanout.agents.map((agent, index) => index === 0 ? { ...agent, status: 'failed' } : agent),
+}
+assert.ok(
+  validateFanoutEvidence(failedReviewerFanout, fanoutPersonas, 'head-1').errors.includes(`FANOUT_REVIEWER_STATUS_INVALID:${fanoutPersonas[0]}`),
+)
+const withTwoChildren = {
+  ...overlappingFanout,
+  agents: [
+    ...overlappingFanout.agents,
+    ...[1, 2].map((index) => ({
+      agentId: `child-${index}`,
+      parentAgentId: 'agent-0',
+      persona: fanoutPersonas[0],
+      role: 'probe',
+      depth: 2,
+      startedAt: new Date(20 * index).toISOString(),
+      finishedAt: new Date(20 * index + 10).toISOString(),
+      status: 'ok',
+    })),
+  ],
+}
+assert.equal(validateFanoutEvidence(withTwoChildren, fanoutPersonas, 'head-1').valid, true)
+const withThirdChild = {
+  ...withTwoChildren,
+  agents: [...withTwoChildren.agents, { ...withTwoChildren.agents.at(-1), agentId: 'child-3' }],
+}
+assert.ok(validateFanoutEvidence(withThirdChild, fanoutPersonas, 'head-1').errors.includes('FANOUT_CHILD_LIMIT_EXCEEDED'))
+const withDepthThree = {
+  ...withTwoChildren,
+  agents: [...withTwoChildren.agents, { ...withTwoChildren.agents.at(-1), agentId: 'grandchild', parentAgentId: 'child-1', depth: 3 }],
+}
+assert.equal(validateFanoutEvidence(withDepthThree, fanoutPersonas, 'head-1').valid, false)
+
+const acceptedDecision = deriveDecision({
+  synthesis: { verdict: 'passable' },
+  nodeResults: fanoutPersonas.map((persona) => ({ persona, status: 'ok' })),
+  coverage: [{ status: 'checked' }],
+  fanoutValidation: validFanout,
+  headUnchanged: true,
+  deadlineExceeded: false,
+  qa: { status: 'not-run' },
+  qaSupplied: false,
+  synthesisStatus: 'ok',
+})
+assert.deepEqual(acceptedDecision, { decision: 'ACCEPT', reasonCodes: [] })
+const rejectedDecision = deriveDecision({
+  synthesis: { verdict: 'blocked' },
+  nodeResults: [{ status: 'failed' }],
+  coverage: [{ status: 'unverified' }],
+  fanoutValidation: validateFanoutEvidence(serialFanout, fanoutPersonas, 'head-1'),
+  headUnchanged: false,
+  deadlineExceeded: true,
+  qa: { status: 'stale' },
+  qaSupplied: true,
+  synthesisStatus: 'failed',
+})
+assert.equal(rejectedDecision.decision, 'REJECT')
+for (const reason of ['BLOCKING_FINDING', 'UNVERIFIED_COVERAGE', 'FAILED_REVIEWER', 'INVALID_FANOUT', 'STALE_HEAD', 'DEADLINE_EXCEEDED', 'SYNTHESIS_FAILED', 'QA_STALE']) {
+  assert.ok(rejectedDecision.reasonCodes.includes(reason), `missing decision reason ${reason}`)
+}
+assert.ok(deriveDecision({
+  synthesis: { verdict: 'passable' },
+  nodeResults: fanoutPersonas.map((persona) => ({ persona, status: 'ok' })),
+  coverage: [{ status: 'checked' }],
+  fanoutValidation: validFanout,
+  headUnchanged: true,
+  deadlineExceeded: false,
+  qa: { status: 'fresh', result: 'FAIL' },
+  qaSupplied: true,
+  synthesisStatus: 'ok',
+}).reasonCodes.includes('QA_FAILED'))
+
+{
+  const signals = []
+  const timers = []
+  const fakeChild = new EventEmitter()
+  fakeChild.pid = 4321
+  fakeChild.stdout = new PassThrough()
+  fakeChild.stderr = new PassThrough()
+  fakeChild.stdin = { end() {} }
+  fakeChild.kill = (signal) => signals.push(['child', signal])
+  const pending = executeRunner(
+    { id: 'codex:fake', kind: 'codex', command: 'unused', model: null },
+    'prompt',
+    '/tmp/repo',
+    '/tmp/evidence',
+    { timeoutMs: 10, killGraceMs: 2 },
+    {
+      spawn: () => fakeChild,
+      kill: (pid, signal) => signals.push([pid, signal]),
+      setTimeout: (fn) => { timers.push(fn); return timers.length },
+      clearTimeout: () => {},
+    },
+  )
+  timers.shift()()
+  await assert.rejects(pending, /timed out/)
+  timers.shift()()
+  if (process.platform === 'win32') {
+    assert.deepEqual(signals, [['child', 'SIGTERM'], ['child', 'SIGKILL']])
+  } else {
+    assert.deepEqual(signals, [[-4321, 'SIGTERM'], [-4321, 'SIGKILL']])
+  }
+}
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'fe-pr-review-test-'))
 try {
-  // Selecting Codex must not execute Cursor model discovery.
-  const shimDir = path.join(temp, 'shim-bin')
-  fs.mkdirSync(shimDir)
-  const cursorMarker = path.join(temp, 'cursor-invoked')
-  fs.writeFileSync(path.join(shimDir, 'cursor-agent'), `#!/bin/sh\ntouch '${cursorMarker}'\nexit 42\n`)
-  fs.writeFileSync(path.join(shimDir, 'codex'), '#!/bin/sh\nexit 0\n')
-  fs.chmodSync(path.join(shimDir, 'cursor-agent'), 0o755)
-  fs.chmodSync(path.join(shimDir, 'codex'), 0o755)
-  const originalPath = process.env.PATH
-  process.env.PATH = `${shimDir}:/bin:/usr/bin`
-  try {
-    assert.deepEqual(discoverRunners({ runner: 'codex' }).map((route) => route.id), ['codex:default'])
-    assert.equal(fs.existsSync(cursorMarker), false, 'excluded providers must not run model discovery')
-  } finally {
-    process.env.PATH = originalPath
-  }
-
   const fresh = path.join(temp, 'qa.json')
   fs.writeFileSync(fresh, JSON.stringify({ revision: 'head-1', result: 'PASS' }))
   assert.equal(qaEvidence(fresh, 'head-1').status, 'fresh')
@@ -156,7 +287,6 @@ try {
   assert.ok(dry.plan.routes.every((entry) => entry.route === null), 'dry-run must work without a provider')
   assert.ok(fs.existsSync(path.join(temp, 'dry-run/snapshot/diff.patch')))
   assert.ok(fs.readFileSync(path.join(temp, 'dry-run/snapshot/diff.patch'), 'utf8').includes('Button.tsx'))
-  assert.ok(fs.existsSync(path.join(temp, 'dry-run/prompts/correctness-platform.md')), 'plan must emit prompts for native subagents')
 
   const previewed = await runGraph(
     { command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'dry-run-routed'), dryRun: true },
@@ -173,10 +303,14 @@ try {
     runGraph({ command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(repo, 'inside'), dryRun: true }, { routes: [] }),
     /outside the reviewed repository/,
   )
-  await assert.rejects(
-    runGraph({ command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'no-runner') }, { routes: [] }),
-    /No safe read-only runner/,
+  const noRunnerDir = path.join(temp, 'no-runner')
+  const noRunner = await runGraph(
+    { command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: noRunnerDir },
+    { routes: [] },
   )
+  assert.equal(noRunner.synthesis.decision, 'REJECT')
+  assert.ok(noRunner.synthesis.reasonCodes.includes('SYNTHESIS_FAILED'))
+  assert.ok(fs.existsSync(path.join(noRunnerDir, 'report.html')), 'missing runners must still emit a truthful report')
   const runDir = path.join(temp, 'run')
   const fakeRoute = { id: 'fake:read-only', kind: 'codex', command: 'unused', model: null }
   let calls = 0
@@ -191,47 +325,21 @@ try {
   assert.equal(result.audit.qa.status, 'fresh')
   assert.equal(result.audit.nodes.length, 6)
   assert.equal(calls, 7)
+  assert.equal(result.synthesis.decision, 'ACCEPT')
+  assert.deepEqual(result.synthesis.reasonCodes, [])
+  assert.equal(result.audit.fanOut.validation.valid, true)
+  assert.ok(result.audit.fanOut.validation.maxObservedConcurrency >= 4)
+  assert.ok(fs.existsSync(path.join(runDir, 'fanout.json')))
   assert.ok(fs.existsSync(path.join(runDir, 'report.md')))
   assert.ok(fs.existsSync(path.join(runDir, 'report.html')))
+  assert.equal(JSON.parse(fs.readFileSync(path.join(runDir, 'report.json'))).decision.value, 'ACCEPT')
   const reportText = fs.readFileSync(path.join(runDir, 'report.md'), 'utf8')
   for (const marker of ['## Feature-gate decision', '### Full feature-gate path', 'fg-off-path', 'fg-persistence-rollback', '## Every review facet']) assert.ok(reportText.includes(marker), `report missing ${marker}`)
   assert.equal(result.report.featureGate.status, 'required')
-
-  // A native host can fan out reviewer subagents, save their JSON, then ask the
-  // graph runner to validate and synthesize those node files.
-  const nativeRunDir = path.join(temp, 'native-run')
-  const nativePlan = await runGraph(
-    { command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: nativeRunDir, dryRun: true },
-    { routes: [] },
-  )
-  for (const persona of nativePlan.plan.personas) {
-    fs.writeFileSync(
-      path.join(nativeRunDir, 'nodes', `${persona}.json`),
-      JSON.stringify({
-        persona,
-        coverage: coverageFor(persona),
-        ...(persona === 'rollout-gates' ? { gateRequirement: { status: 'not-required', rationale: 'No independently releasable behavior', evidence: ['Button.tsx:1'], keys: [] } } : {}),
-        findings: [],
-      }),
-    )
-  }
-  fs.writeFileSync(path.join(nativeRunDir, 'fanout.json'), JSON.stringify({
-    mode: 'native-subagent',
-    reviewers: nativePlan.plan.personas.map((persona, index) => ({
-      persona,
-      startedAt: new Date(1_000 + index * 10).toISOString(),
-      finishedAt: new Date(2_000 + index * 10).toISOString(),
-    })),
-  }))
-  const nativeResult = await runGraph({ command: 'synthesize', runDir: nativeRunDir }, { routes: [fakeRoute], execute })
-  assert.equal(nativeResult.audit.fanOut.mode, 'native-subagent')
-  assert.ok(nativeResult.audit.fanOut.maxObservedConcurrency >= 4)
-  assert.ok(nativeResult.audit.nodes.every((node) => node.route === 'native-subagent'))
-  assert.ok(fs.existsSync(path.join(nativeRunDir, 'candidates.json')), 'native node ingestion must materialize candidates.json')
-
   calls = 0
   const resynthesized = await runGraph({ command: 'synthesize', runDir, qaReport: fresh }, { routes: [fakeRoute], execute })
   assert.equal(resynthesized.synthesis.verdict, 'passable')
+  assert.equal(resynthesized.synthesis.decision, 'ACCEPT')
   assert.equal(calls, 1, 'synthesize must not rerun reviewer nodes')
   // Material fan-out: each persona's findings survive into candidates.json with attribution.
   const findingRunDir = path.join(temp, 'finding-run')
@@ -257,6 +365,9 @@ try {
   assert.deepEqual([...new Set(emitted.map((f) => f.persona))].sort(), selectPersonas(['x.tsx']).slice().sort())
   assert.ok(emitted.every((f) => f.sourceRoute === 'fake:read-only'))
   assert.equal(withFindings.synthesis.verdict, 'blocked')
+  assert.equal(withFindings.synthesis.decision, 'REJECT')
+  assert.equal(withFindings.report.decision.value, 'REJECT')
+  assert.ok(withFindings.synthesis.reasonCodes.includes('BLOCKING_FINDING'))
   assert.equal(withFindings.audit.candidateCount, 6)
   assert.equal(withFindings.audit.parseFailures, 0)
   assert.ok(withFindings.audit.nodes.every((node) => node.findings === 1))
@@ -271,64 +382,14 @@ try {
   assert.ok(!fs.existsSync(path.join(findingRunDir, 'nodes', 'missing.json')))
   assert.equal(fs.readdirSync(path.join(findingRunDir, 'nodes')).length, 6)
 
-  // One runner kind must still execute reviewers concurrently. This guards
-  // against a route-wide lock silently turning fan-out into a serial queue.
-  const parallelRunDir = path.join(temp, 'parallel-run')
-  const cursorRoute = { id: 'cursor:auto', kind: 'cursor', command: 'unused', model: 'auto' }
-  let active = 0
-  let maxActive = 0
-  const progressEvents = []
-  const executeParallel = async (_route, prompt) => {
-    if (prompt.includes('independent synthesis judge')) return JSON.stringify({ blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'No findings' })
-    active++
-    maxActive = Math.max(maxActive, active)
-    await new Promise((resolve) => setTimeout(resolve, 25))
-    active--
-    const persona = prompt.match(/"persona":"([^"]+)"/)?.[1]
-    return JSON.stringify({ persona, coverage: coverageFor(persona), ...(persona === 'rollout-gates' ? { gateRequirement: { status: 'not-required', rationale: 'No independently releasable behavior', evidence: ['Button.tsx:1'], keys: [] } } : {}), findings: [] })
-  }
-  const parallelRun = await runGraph(
-    { command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: parallelRunDir, maxWorkers: 4 },
-    { routes: [cursorRoute], execute: executeParallel, onProgress: (event) => progressEvents.push(event) },
-  )
-  assert.ok(maxActive >= 4, `expected material fan-out, observed ${maxActive}`)
-  assert.ok(parallelRun.audit.fanOut.maxObservedConcurrency >= 4)
-  const firstCompletion = progressEvents.findIndex((event) => event.phase === 'review' && event.status !== 'started')
-  assert.ok(firstCompletion >= 4, 'reviewer starts must be observable before the first reviewer completes')
-
-  const cursorTimeoutRun = await runGraph(
-    { command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'cursor-timeout'), maxAttempts: 2 },
-    {
-      routes: [
-        { id: 'cursor:model-a', kind: 'cursor', command: 'unused', model: 'model-a' },
-        { id: 'cursor:model-b', kind: 'cursor', command: 'unused', model: 'model-b' },
-      ],
-      execute: async () => { throw new Error('Runner timed out after 10ms') },
-    },
-  )
-  const cursorFailures = cursorTimeoutRun.audit.nodes.flatMap((node) => node.attempts).filter((attempt) => attempt.status === 'failed')
-  assert.ok(cursorFailures.length <= 4, 'a provider timeout must circuit-break queued reviewers and alternate models')
-  assert.equal(cursorTimeoutRun.audit.synthesis.attempts.some((attempt) => attempt.status === 'failed'), false)
-
-  const boundedAttempts = await runGraph(
-    { command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'bounded-attempts'), maxAttempts: 1 },
-    {
-      routes: [
-        { id: 'fake:a', kind: 'codex', command: 'unused', model: null },
-        { id: 'fake:b', kind: 'claude', command: 'unused', model: null },
-      ],
-      execute: async () => { throw new Error('simulated node failure') },
-    },
-  )
-  assert.ok(boundedAttempts.audit.nodes.every((node) => node.attempts.filter((attempt) => attempt.status === 'failed').length === 1))
-  assert.equal(boundedAttempts.audit.synthesis.attempts.filter((attempt) => attempt.status === 'failed').length, 1)
-
   // Stale QA evidence can never round up to a pass.
   const staleQa = path.join(temp, 'stale-qa.json')
   fs.writeFileSync(staleQa, JSON.stringify({ revision: 'some-other-head', result: 'PASS' }))
   const staleRun = await runGraph({ command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'stale-run'), qaReport: staleQa }, { routes: [fakeRoute], execute })
   assert.equal(staleRun.audit.qa.status, 'stale')
   assert.equal(staleRun.synthesis.verdict, 'unverified', 'stale QA evidence is never a pass')
+  assert.equal(staleRun.synthesis.decision, 'REJECT')
+  assert.ok(staleRun.synthesis.reasonCodes.includes('QA_STALE'))
   assert.equal(staleRun.audit.qa.content, undefined, 'audit must not inline QA report content')
 
   // Markdown QA reports can still declare their tested revision.
@@ -347,6 +408,7 @@ try {
   }
   const failedRun = await runGraph({ command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: failedRunDir }, { routes: [fakeRoute], execute: executeWithFailure })
   assert.equal(failedRun.synthesis.verdict, 'unverified', 'failed reviewer evidence cannot synthesize to passable')
+  assert.ok(failedRun.synthesis.reasonCodes.includes('FAILED_REVIEWER'))
   const executeWithUnknownGate = async (_route, prompt) => {
     if (prompt.includes('independent synthesis judge')) return JSON.stringify({ blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'No findings' })
     const persona = prompt.match(/"persona":"([^"]+)"/)?.[1]
@@ -362,9 +424,141 @@ try {
   assert.equal(allFailed.audit.status, 'unverified')
   assert.equal(allFailed.audit.synthesis.status, 'failed')
   assert.equal(allFailed.synthesis.verdict, 'unverified')
+  assert.equal(allFailed.synthesis.decision, 'REJECT')
+  assert.ok(allFailed.synthesis.reasonCodes.includes('SYNTHESIS_FAILED'))
   assert.equal(allFailed.report.coverage.length, 45)
   assert.ok(allFailed.report.coverage.every((row) => row.status === 'unverified'))
   assert.ok(fs.existsSync(path.join(allFailedDir, 'report.html')), 'failed synthesis must still emit a truthful report')
+
+  const serialNativeDir = path.join(temp, 'serial-native')
+  fs.cpSync(runDir, serialNativeDir, { recursive: true })
+  fs.rmSync(path.join(serialNativeDir, 'audit.json'))
+  fs.rmSync(path.join(serialNativeDir, 'candidates.json'))
+  const serialBase = Date.now()
+  writeJsonForTest(path.join(serialNativeDir, 'fanout.json'), {
+    version: 1,
+    mode: 'native-subagent',
+    h0: head,
+    agents: result.plan.personas.map((persona, index) => ({
+      agentId: `native-${index}`,
+      parentAgentId: null,
+      persona,
+      role: 'reviewer',
+      depth: 1,
+      startedAt: new Date(serialBase + index * 100).toISOString(),
+      finishedAt: new Date(serialBase + index * 100 + 50).toISOString(),
+      status: 'ok',
+    })),
+  })
+  calls = 0
+  const serialNative = await runGraph({ command: 'synthesize', runDir: serialNativeDir, qaReport: fresh }, { routes: [fakeRoute], execute })
+  assert.equal(serialNative.synthesis.verdict, 'passable')
+  assert.equal(serialNative.synthesis.decision, 'REJECT')
+  assert.equal(serialNative.report.decision.value, 'REJECT')
+  assert.ok(serialNative.synthesis.reasonCodes.includes('INVALID_FANOUT'))
+  assert.equal(calls, 1)
+  assert.ok(fs.existsSync(path.join(serialNativeDir, 'candidates.json')), 'native synthesis must derive candidates from node files')
+
+  const missingFanoutDir = path.join(temp, 'missing-fanout')
+  fs.cpSync(runDir, missingFanoutDir, { recursive: true })
+  fs.rmSync(path.join(missingFanoutDir, 'audit.json'))
+  fs.rmSync(path.join(missingFanoutDir, 'fanout.json'))
+  const missingFanout = await runGraph({ command: 'synthesize', runDir: missingFanoutDir, qaReport: fresh }, { routes: [fakeRoute], execute })
+  assert.equal(missingFanout.synthesis.decision, 'REJECT')
+  assert.ok(missingFanout.synthesis.reasonCodes.includes('INVALID_FANOUT'))
+
+  let deadlineClock = 0
+  const deadlineRun = await runGraph(
+    {
+      command: 'run',
+      repoRoot: repo,
+      base: 'HEAD^',
+      head: 'HEAD',
+      output: path.join(temp, 'deadline-run'),
+      maxWorkers: '1',
+      runTimeoutSeconds: '100',
+      nodeTimeoutSeconds: '20',
+      synthesisTimeoutSeconds: '10',
+      deadlineEpochMs: '30000',
+    },
+    {
+      routes: [fakeRoute],
+      now: () => deadlineClock,
+      execute: async (_route, prompt) => {
+        deadlineClock += 15000
+        const persona = prompt.match(/"persona":"([^"]+)"/)?.[1]
+        return JSON.stringify({ persona, coverage: coverageFor(persona), findings: [] })
+      },
+    },
+  )
+  assert.equal(deadlineRun.audit.runtime.policy.runTimeoutMs, 100000)
+  assert.equal(deadlineRun.audit.runtime.deadlineAt, new Date(30000).toISOString())
+  assert.equal(deadlineRun.audit.runtime.exceeded, true)
+  assert.equal(deadlineRun.synthesis.decision, 'REJECT')
+  assert.ok(deadlineRun.synthesis.reasonCodes.includes('DEADLINE_EXCEEDED'))
+  assert.ok(deadlineRun.audit.nodes.some((node) => node.attempts.some((attempt) => attempt.category === 'synthesis-reserve')), 'reviewers must stop when synthesis reserve begins')
+
+  const timeoutCalls = []
+  let reserveClock = 0
+  await runGraph(
+    {
+      command: 'run',
+      repoRoot: repo,
+      base: 'HEAD^',
+      head: 'HEAD',
+      output: path.join(temp, 'reserve-run'),
+      maxWorkers: '1',
+      runTimeoutSeconds: '41',
+      nodeTimeoutSeconds: '80',
+      synthesisTimeoutSeconds: '20',
+    },
+    {
+      routes: [fakeRoute],
+      now: () => reserveClock,
+      execute: async (_route, prompt, _repoRoot, _runDir, runtime) => {
+        timeoutCalls.push(runtime.timeoutMs)
+        if (prompt.includes('independent synthesis judge')) return JSON.stringify({ blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'No findings' })
+        reserveClock = 22_000
+        const persona = prompt.match(/"persona":"([^"]+)"/)?.[1]
+        return JSON.stringify({ persona, coverage: coverageFor(persona), findings: [] })
+      },
+    },
+  )
+  assert.deepEqual(timeoutCalls, [21_000, 19_000], 'reviewer timeout must preserve synthesis reserve and synthesis must use only the remaining deadline')
+
+  const breakerRoutes = [
+    { id: 'codex:fake', kind: 'codex', command: 'unused', model: null },
+    { id: 'claude:fake', kind: 'claude', command: 'unused', model: null },
+  ]
+  const providerCalls = []
+  const breakerRun = await runGraph(
+    { command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'breaker-run'), maxWorkers: '1' },
+    {
+      routes: breakerRoutes,
+      execute: async (route, prompt) => {
+        providerCalls.push(route.kind)
+        if (route.kind === 'codex') throw new Error('Runner timed out after 1ms')
+        if (prompt.includes('independent synthesis judge')) return JSON.stringify({ blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'No findings' })
+        const persona = prompt.match(/"persona":"([^"]+)"/)?.[1]
+        return JSON.stringify({
+          persona,
+          coverage: coverageFor(persona),
+          ...(persona === 'rollout-gates' ? { gateRequirement: { status: 'not-required', rationale: 'No independently releasable behavior', evidence: ['Button.tsx:1'], keys: [] } } : {}),
+          findings: [],
+        })
+      },
+    },
+  )
+  assert.equal(providerCalls.filter((kind) => kind === 'codex').length, 1, 'a provider timeout must open the provider-kind breaker immediately')
+  assert.equal(breakerRun.audit.providerBreakers.codex, 'timeout')
+  assert.ok(breakerRun.audit.nodes.every((node) => node.attempts.filter((attempt) => attempt.status !== 'skipped').length <= 2), 'reviewer attempts must never exceed two')
+
+  const helpResult = spawnSync(process.execPath, [path.resolve('skills/fe-pr-review/scripts/review-graph.mjs'), 'help'], { encoding: 'utf8' })
+  assert.equal(helpResult.status, 0, helpResult.stderr)
+  for (const flag of ['--run-timeout-seconds', '--node-timeout-seconds', '--synthesis-timeout-seconds', '--deadline-epoch-ms', '--max-attempts']) {
+    assert.ok(helpResult.stdout.includes(flag), `help missing ${flag}`)
+  }
+
   const report = buildReviewReport({ snapshot: { h0: head, base: 'base', diffHash: 'hash' }, synthesis: { blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Owner checklist', summary: 'Human follow-up only', affectsVerdict: false, verdictImpact: 'none' }], verdict: 'passable', rationale: 'clear' }, qa: { status: 'not-run', reason: 'No matching story' }, selected: ['rollout-gates'], nodeResults: [{ persona: 'rollout-gates', status: 'ok', value: gateCandidate }] })
   assert.ok(report.markdown.includes('No matching story'))
   assert.ok(report.markdown.includes('Operational follow-ups'))
@@ -378,7 +572,7 @@ try {
   assert.ok(report.html.includes('id="top-jump"'))
   assert.ok(report.html.includes('Read in order'))
   assert.ok(report.html.includes('revealHashTarget'))
-  assert.ok(!report.html.includes('const URL_RE'), 'URL regex must not be a late const — findings render before it would initialize')
+  assert.ok(!report.html.includes('const URL_RE'), 'URL regex must not be a late const: findings render before it would initialize')
   const passExec = buildReportDocument({
     snapshot: { h0: head, base: 'base', diffHash: 'hash' },
     synthesis: { blocking: [], nonBlocking: [], unverified: [], verdict: 'passable', rationale: 'clear' },

@@ -137,6 +137,28 @@ for (const marker of ['Never merge', '--html', 'GitHub', 'Bitbucket', '3 automat
 
 const feReview = fs.readFileSync(path.join(root, 'skills/fe-pr-review/SKILL.md'), 'utf8')
 for (const marker of [
+  'Unbounded recursive delegation is forbidden',
+  'at most four eligible PRs',
+  'one top-level worker per PR concurrently',
+  'absolute 30-minute deadline',
+  'never more than six',
+  'material overlap',
+  'two focused probe children',
+  'depth 2',
+  'No depth 3',
+  '--max-attempts 2',
+  '--node-timeout-seconds 480',
+  '--synthesis-timeout-seconds 240',
+  '--run-timeout-seconds 1500',
+  'Do not retry every provider',
+  'Stop work that cannot fit the remaining time',
+  'ACCEPT',
+  'REJECT: defect',
+  'REJECT: incomplete',
+  'publication idempotency key',
+  'publish-statlas.mjs',
+  'Verify the returned Statlas URL is reachable',
+  'Scheduled batch mode explicitly authorizes Statlas report publication only',
   'qa-demo',
   'opt-in',
   'explicitly requests',
@@ -144,15 +166,13 @@ for (const marker of [
   'UNVERIFIED',
   'Agent agreement is not proof',
   'review-graph.mjs',
-  '--dry-run',
-  '--qa-report',
   'audit.json',
   'read-only',
-  'full feature-gate path',
+  'feature-gate path',
   'report.html',
   'Statlas',
-  'every facet',
-  'historical regression probes',
+  'every assigned facet',
+  'Historical regression probes',
   'fail-fast',
   'pre-fix',
 ]) {
@@ -160,15 +180,60 @@ for (const marker of [
 }
 
 const feContracts = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/contracts.md'), 'utf8')
-for (const marker of ['not-run', 'stale', 'opt-in', 'does not change the code verdict', 'candidates.json', 'Runner safety', 'Filesystem safety', 'gateRequirement', 'report.json', 'Historical regression evidence', 'pre-fix behavior']) {
+for (const marker of [
+  'at most four eligible PRs',
+  'one top-level worker per PR concurrently',
+  'absolute 30-minute deadline',
+  '3-6 persona reviewers',
+  'at most two focused probe children at depth 2',
+  'Depth 3',
+  '--max-workers 4',
+  '--max-attempts 2',
+  '--node-timeout-seconds 480',
+  '--synthesis-timeout-seconds 240',
+  '--run-timeout-seconds 1500',
+  'Do not retry every provider',
+  'ACCEPT',
+  'REJECT: defect',
+  'REJECT: incomplete',
+  'idempotency key',
+  'publish-statlas.mjs',
+  'Verify the returned URL is reachable',
+  'Automatic PR comments',
+  'not-run',
+  'opt-in',
+  'gateRequirement',
+  'report.json',
+  'Runner safety',
+  'Filesystem safety',
+  'Historical regression evidence',
+  'pre-fix behavior',
+]) {
   assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing: ${marker}`)
 }
-for (const marker of ['reproduction', 'rootCause', 'suggestedPatch']) assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing publishable finding field: ${marker}`)
+for (const marker of ['reproduction', 'rootCause', 'suggestedPatch']) {
+  assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing publishable finding field: ${marker}`)
+}
 
 const fePersonas = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/personas.md'), 'utf8')
 const personaIds = ['repository-contract', 'correctness-platform', 'accessibility-ui', 'rollout-gates', 'privacy-security-data', 'product-tests']
 for (const id of personaIds) assert.ok(fePersonas.includes(id), `personas reference missing ${id}`)
-for (const marker of ['Historical regression probes', 'CI-surface parity', 'runtime/service-descriptor substitution', 'dynamic-key boundaries', 'temporal history/cache', 'side-effect liveness', 'test-oracle validity']) {
+for (const marker of [
+  '3-6 personas per PR',
+  'no more than six',
+  'Launch the first four selected persona reviewers concurrently',
+  'material overlap',
+  'two focused probe children at depth 2',
+  'no depth 3',
+  'disables probe children',
+  'Historical regression probes',
+  'CI-surface parity',
+  'runtime or service-descriptor substitution',
+  'dynamic-key boundaries',
+  'temporal history or cache behavior',
+  'side-effect liveness',
+  'test-oracle validity',
+]) {
   assert.ok(fePersonas.includes(marker), `personas reference missing historical probe marker: ${marker}`)
 }
 
@@ -205,7 +270,9 @@ const beEvaluation = fs.readFileSync(path.join(root, 'skills/be-pr-review/refere
 for (const marker of ['train/validation/holdout', 'recurring in at least three independent PRs', 'Negative controls', 'read-check-write races', 'derived-value consistency']) assert.ok(beEvaluation.includes(marker), `be-pr-review evaluation missing ${marker}`)
 const beContracts = fs.readFileSync(path.join(root, 'skills/be-pr-review/references/contracts.md'), 'utf8')
 for (const marker of ['read-check-write atomicity', 'fail-soft fallbacks', 'derived-value consistency', 'explicit verification obligations']) assert.ok(beContracts.includes(marker), `be-pr-review contracts missing ${marker}`)
-for (const marker of ['reproduction', 'rootCause', 'suggestedPatch']) assert.ok(beContracts.includes(marker), `be-pr-review contracts missing publishable finding field: ${marker}`)
+for (const marker of ['reproduction', 'rootCause', 'suggestedPatch']) {
+  assert.ok(beContracts.includes(marker), `be-pr-review contracts missing publishable finding field: ${marker}`)
+}
 
 const bePersonas = fs.readFileSync(path.join(root, 'skills/be-pr-review/references/personas.md'), 'utf8')
 const bePersonaIds = ['repository-contract', 'api-compatibility', 'data-migrations', 'concurrency-reliability', 'security-observability-performance', 'tests-rollout']
@@ -218,9 +285,8 @@ assert.ok(!/^import .* from '(?!node:|\.)/m.test(beGraph), 'backend review graph
 const review = fs.readFileSync(path.join(root, 'skills/review/SKILL.md'), 'utf8')
 for (const marker of [
   'name: review',
-  'current working-tree changes',
   'explicit pull request',
-  'local/remote branch',
+  'local or remote branch',
   'fe-pr-review',
   'be-pr-review',
   'H0 = worktree:',
@@ -239,17 +305,39 @@ for (const marker of [
   'leyline_memory_recall',
   '.agents/review-learnings.md',
   'review-learning.json',
-  '"schemaVersion": 1',
   'untrusted historical evidence',
   'leyline_memory_mark_useful',
   'opt-in',
-  'explicitly requests',
-  'not-run',
+  'explicitly requested',
+  'Scheduled batch mode',
+  'at most four eligible',
+  'one top-level worker per PR concurrently',
+  'absolute 30-minute deadline',
+  'Every admitted completed or timed-out PR gets a truthful Statlas report',
+  'REJECT: defect',
+  'REJECT: incomplete',
+  'idempotency key',
+  'Verify the returned URL is reachable',
+  'Do not run broad builds or test suites',
+  'retry every provider',
+  'Automatic PR comments and Slack notifications are outside scheduled review',
 ]) assert.ok(review.includes(marker), `review missing unified routing contract: ${marker}`)
 
 const blockerComment = fs.readFileSync(path.join(root, 'skills/review/references/blocking-pr-comment.md'), 'utf8')
 for (const marker of ['### 🔴 Blocker:', '#### 🧪 How to reproduce', '#### 🔎 Root cause', '#### 🛠 Suggested fix', '#### ✅ Focused verification', 'sdlc-review:blocker', 'fingerprint']) {
   assert.ok(blockerComment.includes(marker), `blocking PR comment format missing ${marker}`)
+}
+
+const contractEditFiles = [
+  'skills/fe-pr-review/SKILL.md',
+  'skills/fe-pr-review/references/contracts.md',
+  'skills/fe-pr-review/references/personas.md',
+  'skills/review/SKILL.md',
+  'scripts/test-skill-contracts.mjs',
+]
+for (const relative of contractEditFiles) {
+  const body = fs.readFileSync(path.join(root, relative), 'utf8')
+  assert.ok(!body.includes('\u2014'), `${relative} must not contain an em dash`)
 }
 
 for (const [name, body] of [['fe-pr-review', feReview], ['be-pr-review', beReview]]) {
@@ -297,7 +385,7 @@ for (const marker of [
   '15 most recently reviewed PRs',
   'exactly matches that authenticated provider identity',
   'Never fall back to “probably me.”',
-  'materialize the complete thread—including all author, reviewer, and other human replies',
+  `materialize the complete thread${'\u2014'}including all author, reviewer, and other human replies`,
   'Replies supply decision evidence but never become independently learned source comments',
   'non-matching source comments excluded before candidate-thread expansion',
   'references/contract.md',

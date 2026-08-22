@@ -37,6 +37,7 @@ try {
   for (const file of [
     'scripts/review-graph.mjs',
     'scripts/test-review-graph.mjs',
+    'scripts/publish-statlas.mjs',
     'references/personas.md',
     'references/contracts.md',
   ]) {

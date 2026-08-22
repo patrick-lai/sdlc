@@ -1,18 +1,40 @@
 # Reviewer personas
 
-Every node receives the same `H0`, diff hash, publish bar, structured-output contract, and untrusted-input warning. Each reviewer returns one explicit, evidence-backed coverage row for every assigned facet; missing or vague rows fail the node.
+Every persona receives the same `H0`, diff hash, publish bar, structured-output contract, deadline, and untrusted-input warning. Each returns one concrete coverage row for every assigned facet. Missing or vague rows fail the node.
 
-1. **repository-contract** — root and nearest instructions, package/import/dependency boundaries, entrypoints/generated APIs, ownership/lockfiles, suppressions/test placement, PR-versus-post-merge CI parity, runtime/service-descriptor substitution fail-fast behavior, and dependency-resolution blast radius.
-2. **correctness-platform** — state transitions, async/error paths, SSR/hydration, compatibility/deploy order, performance/resilience, dynamic-key boundary grammar, GraphQL/Relay selection compatibility, reload/history/undo/cache state, and exactly-once side-effect liveness across refactors.
-3. **accessibility-ui** — semantics/names, keyboard/focus, programmatic state, contrast/tokens/modes, reflow/motion/touch, i18n/RTL, and design-system use.
-4. **rollout-gates** — first decide whether a gate is required, then trace definition/key/type/owner/default, evaluation context and identity timing, targeting, exact gate-off behavior, complete gate-on states, exposure, SSR/client parity, persisted-data rollback, both-branch tests, and cleanup ownership. For explicit gate cleanup, compare the result with the selected winning branch and treat controls confined to the deleted losing branch as retired with it. Do not invent a still-off cohort without concrete evidence. The full path is mandatory when gating is required.
-5. **privacy-security-data** — authorization/tenancy, telemetry PII, secrets/error capture, taxonomy/cardinality, integrity, retries, and exactly-once behavior across duplicate events, tabs, and sessions.
-6. **product-tests** — stated criteria, inferred states, responsive/themes/content limits, parity/adjacent behavior, tests/docs/messaging, and proof that regression-test fixtures fail on the pre-fix behavior.
+Use 3-6 personas per PR and no more than six. Always select the three core personas. Add conditional specialists only when the frozen diff and contracts justify them.
 
-The planner always uses repository-contract, correctness-platform, and privacy-security-data. Frontend source or stories add accessibility-ui and rollout-gates; frontend or test evidence adds product-tests. A caller may force 3–6 known IDs with `--personas`.
+## Core personas
 
-Add a specialist only by replacing, not duplicating, a broad lens. Keep the total at six.
+1. **repository-contract**: root and nearest instructions, package and import boundaries, entrypoints, generated APIs, ownership, lockfiles, suppressions, test placement, CI-surface parity, runtime or service-descriptor substitution, fail-fast behavior, and dependency-resolution blast radius.
+2. **correctness-platform**: state transitions, async and error paths, SSR and hydration, compatibility and deploy order, performance and resilience, dynamic-key grammar, GraphQL or Relay selection compatibility, history and cache state, and exactly-once side-effect liveness.
+3. **privacy-security-data**: authorization and tenancy, telemetry PII, secrets and error capture, taxonomy and cardinality, integrity, retries, and exactly-once behavior across duplicate events, tabs, and sessions.
+
+## Conditional specialists
+
+4. **accessibility-ui**: semantics and names, keyboard and focus, programmatic state, contrast and tokens, modes, reflow, motion, touch, i18n, RTL, and design-system use.
+5. **rollout-gates**: decide whether a gate is required, then trace definition, key, type, owner, default, evaluation identity and timing, targeting, exact off behavior, complete on states, exposure, SSR and client parity, persistence and rollback, both-branch tests, and cleanup. For explicit cleanup, compare with the selected winning branch.
+6. **product-tests**: stated criteria, inferred states, responsive and theme behavior, content limits, parity, adjacent behavior, tests, docs, messaging, and proof that regression fixtures fail against pre-fix behavior.
+
+Frontend source or stories usually add `accessibility-ui` and `rollout-gates`. Frontend behavior or test changes may add `product-tests`. Replace a broad lens with a more relevant specialist rather than exceeding six.
+
+## Native fan-out contract
+
+Launch the first four selected persona reviewers concurrently. Launch remaining personas as slots free. At least two top-level reviewers must show material overlap in recorded timestamps. Agreement is not evidence.
+
+Top-level reviewers are depth 1. Each may optionally launch no more than two focused probe children at depth 2:
+
+- one narrow question per child;
+- a short bounded timeout inside the parent's deadline;
+- compact evidence returned to the parent;
+- no full-persona duplication;
+- no independent verdict;
+- no child delegation and no depth 3.
+
+Probe children are useful for focused caller tracing, contract lookup, or test-oracle inspection. They are not a mechanism for an unbounded nested army.
+
+Portable CLI mode uses the same personas but disables probe children because their hierarchy and timing cannot be enforced reliably.
 
 ## Historical regression probes
 
-The eight added probes are deliberately cross-cutting: CI-surface parity, runtime/service-descriptor substitution, dependency-resolution risk, dynamic-key boundaries, schema-selection compatibility, temporal history/cache, side-effect liveness, and test-oracle validity. They came from recurring fix/revert archetypes and must be answered with changed-code evidence, not generic assurances.
+The cross-cutting probes are CI-surface parity, runtime or service-descriptor substitution, dependency-resolution risk, dynamic-key boundaries, schema-selection compatibility, temporal history or cache behavior, side-effect liveness, and test-oracle validity. Answer them with changed-code evidence, not generic assurances.
