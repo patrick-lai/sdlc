@@ -8,6 +8,7 @@ import {
   PERSONAS,
   PERSONA_FACETS,
   assertOutsideRepo,
+  assertPortableConsent,
   buildRunnerCommand,
   discoverRunners,
   makePlan,
@@ -120,6 +121,40 @@ try {
   assert.equal(allFailed.synthesis.verdict, 'unverified')
   assert.ok(allFailed.report.coverage.every((row) => row.status === 'unverified'))
   assert.ok(fs.existsSync(path.join(temp, 'failed/report.html')))
+
+  // Regression: `run` spawns external model CLIs and must not be reachable without
+  // explicit consent, otherwise a scheduled native review can exhaust external quota.
+  assert.deepEqual(parseArgs(['run', '--portable-cli']), { command: 'run', portableCli: true })
+  assert.throws(() => assertPortableConsent({ command: 'run' }), /--portable-cli/)
+  assert.throws(() => assertPortableConsent({ command: 'run', runner: 'cursor,claude' }), /external provider quota/)
+  assert.deepEqual(assertPortableConsent({ command: 'run', portableCli: true }), { command: 'run', portableCli: true })
+  assert.deepEqual(assertPortableConsent({ command: 'run', dryRun: true }), { command: 'run', dryRun: true })
+  assert.deepEqual(assertPortableConsent({ command: 'plan' }), { command: 'plan' })
+
+  const consentShimDir = path.join(temp, 'consent-cli-shims')
+  fs.mkdirSync(consentShimDir)
+  const consentMarkers = []
+  for (const command of ['cursor-agent', 'claude', 'codex']) {
+    const marker = path.join(temp, `consent-${command}-invoked`)
+    consentMarkers.push(marker)
+    fs.writeFileSync(path.join(consentShimDir, command), `#!/bin/sh\nprintf invoked > '${marker}'\nexit 97\n`)
+    fs.chmodSync(path.join(consentShimDir, command), 0o755)
+  }
+  const refused = spawnSync(process.execPath, [
+    path.resolve('skills/be-pr-review/scripts/review-graph.mjs'),
+    'run',
+    '--repo-root', repo,
+    '--base', 'HEAD^',
+    '--head', 'HEAD',
+    '--runner', 'cursor,claude',
+    '--output', path.join(temp, 'refused-portable-run'),
+  ], { encoding: 'utf8', env: { ...process.env, PATH: `${consentShimDir}:${process.env.PATH}` } })
+  assert.equal(refused.status, 1, 'run without --portable-cli must fail closed')
+  assert.match(refused.stderr, /--portable-cli/)
+  assert.ok(
+    consentMarkers.every((marker) => !fs.existsSync(marker)),
+    'run without explicit consent must not invoke Cursor, Claude, or Codex CLI executables',
+  )
 } finally {
   fs.rmSync(temp, { recursive: true, force: true })
 }

@@ -6,7 +6,7 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import os from 'node:os'
 import path from 'node:path'
-import { DEFAULT_RUNTIME_POLICY, PERSONA_FACETS, assertOutsideRepo, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, deriveDecision, discoverRunners, executeRunner, makePlan, nativeSynthesisPrompt, normalizeRuntimePolicy, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateFanoutEvidence, validateNativeSynthesis, validateSynthesis } from './review-graph.mjs'
+import { DEFAULT_RUNTIME_POLICY, PERSONA_FACETS, assertOutsideRepo, assertPortableConsent, assertSafeModelId, buildReviewReport, buildRunnerCommand, classifyRunnerFailure, clip, deriveDecision, discoverRunners, executeRunner, makePlan, nativeSynthesisPrompt, normalizeRuntimePolicy, parseArgs, qaEvidence, qaForPrompt, runGraph, selectPersonas, validateCandidate, validateFanoutEvidence, validateNativeSynthesis, validateSynthesis } from './review-graph.mjs'
 import { buildReportDocument } from './lib/report.mjs'
 
 assert.deepEqual(parseArgs(['run', '--max-workers', '3', '--dry-run']), { command: 'run', maxWorkers: '3', dryRun: true })
@@ -669,6 +669,41 @@ try {
   for (const flag of ['--run-timeout-seconds', '--node-timeout-seconds', '--synthesis-timeout-seconds', '--deadline-epoch-ms', '--max-attempts']) {
     assert.ok(helpResult.stdout.includes(flag), `help missing ${flag}`)
   }
+  assert.ok(helpResult.stdout.includes('run --portable-cli'), 'help must document run as requiring explicit portable consent')
+
+  // Regression: a scheduled native review once burned external provider quota by calling
+  // `run --runner cursor,claude`. `run` must refuse to spawn external CLIs without consent.
+  assert.throws(() => assertPortableConsent({ command: 'run' }), /--portable-cli/)
+  assert.throws(() => assertPortableConsent({ command: 'run', runner: 'cursor,claude' }), /external provider quota/)
+  assert.deepEqual(assertPortableConsent({ command: 'run', portableCli: true }), { command: 'run', portableCli: true })
+  assert.deepEqual(assertPortableConsent({ command: 'run', dryRun: true }), { command: 'run', dryRun: true })
+  assert.deepEqual(assertPortableConsent({ command: 'plan' }), { command: 'plan' })
+  assert.deepEqual(assertPortableConsent({ command: 'synthesize' }), { command: 'synthesize' })
+
+  const quotaShimDir = path.join(temp, 'consent-cli-shims')
+  fs.mkdirSync(quotaShimDir)
+  const quotaMarkers = []
+  for (const command of ['cursor-agent', 'claude', 'codex']) {
+    const marker = path.join(temp, `consent-${command}-invoked`)
+    quotaMarkers.push(marker)
+    fs.writeFileSync(path.join(quotaShimDir, command), `#!/bin/sh\nprintf invoked > '${marker}'\nexit 97\n`)
+    fs.chmodSync(path.join(quotaShimDir, command), 0o755)
+  }
+  const withoutConsent = spawnSync(process.execPath, [
+    path.resolve('skills/fe-pr-review/scripts/review-graph.mjs'),
+    'run',
+    '--repo-root', repo,
+    '--base', 'HEAD^',
+    '--head', 'HEAD',
+    '--runner', 'cursor,claude',
+    '--output', path.join(temp, 'refused-portable-run'),
+  ], { encoding: 'utf8', env: { ...process.env, PATH: `${quotaShimDir}:${process.env.PATH}` } })
+  assert.equal(withoutConsent.status, 1, 'run without --portable-cli must fail closed')
+  assert.match(withoutConsent.stderr, /--portable-cli/)
+  assert.ok(
+    quotaMarkers.every((marker) => !fs.existsSync(marker)),
+    'run without explicit consent must not invoke Cursor, Claude, or Codex CLI executables',
+  )
 
   const report = buildReviewReport({ snapshot: { h0: head, base: 'base', diffHash: 'hash' }, synthesis: { blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [{ title: 'Owner checklist', summary: 'Human follow-up only', affectsVerdict: false, verdictImpact: 'none' }], verdict: 'passable', rationale: 'clear' }, qa: { status: 'not-run', reason: 'No matching story' }, selected: ['rollout-gates'], nodeResults: [{ persona: 'rollout-gates', status: 'ok', value: gateCandidate }] })
   assert.ok(report.markdown.includes('No matching story'))

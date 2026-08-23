@@ -983,13 +983,22 @@ export async function runGraph(options, injected = {}) {
   return { runDir: created.runDir, plan, audit, synthesis, report }
 }
 
+export const PORTABLE_CONSENT_ERROR = '`run` spawns external model CLIs (Cursor, Claude, Codex CLI) and consumes external provider quota. It requires explicit `--portable-cli` consent. The default Codex path is `plan` plus native subagents plus `synthesize`, which inherits the parent model.'
+
+export function assertPortableConsent(args) {
+  if (args.command !== 'run') return args
+  if (args.portableCli === true) return args
+  if (args.dryRun === true) return args
+  throw new Error(PORTABLE_CONSENT_ERROR)
+}
+
 function help() {
   console.log(`fe-pr-review graph runner (read-only; never comments, approves, merges, pushes, commits, or deploys)
 
 Usage:
   review-graph.mjs plan --repo-root DIR [--base REF] [--head REF] [--output DIR] [--personas a,b,c]
   review-graph.mjs synthesize --run-dir DIR [--native-synthesis FILE] [--qa-report FILE]
-  review-graph.mjs run --repo-root DIR [--base REF] [--head REF] [--output DIR]
+  review-graph.mjs run --portable-cli --repo-root DIR [--base REF] [--head REF] [--output DIR]
       [--personas a,b,c] [--runner cursor,codex,claude] [--model ID]
       [--max-workers N] [--max-attempts 1|2]
       [--run-timeout-seconds N] [--node-timeout-seconds N]
@@ -1002,7 +1011,8 @@ Usage:
 Notes:
   plan always uses the native-host handoff, launches no model CLI, and writes reviewer plus synthesis prompts.
   synthesize reads native-synthesis.json by default and never discovers external model CLIs unless --portable-cli is explicit.
-  run is the explicit portable CLI fallback. The Codex skill must not call it when built-in subagents are available.
+  run is the explicit portable CLI fallback and requires --portable-cli, because it spawns external model CLIs and consumes external provider quota.
+  The native Codex path is plan plus native subagents plus synthesize. It inherits the parent model, so it never exhausts an external provider.
   --output must be outside the reviewed repository.
   Defaults: 25-minute graph cap inside the outer 30-minute PR budget, 8-minute reviewer attempts, 4-minute synthesis, and at most 2 attempts per node.
   --deadline-epoch-ms propagates the absolute outer PR deadline established at admission.
@@ -1017,6 +1027,7 @@ async function main() {
   else if (args.command === 'synthesize') {
     if (!args.runDir) throw new Error('synthesize requires --run-dir')
   } else if (args.command !== 'run') throw new Error(`Unknown command: ${args.command}`)
+  assertPortableConsent(args)
   const result = await runGraph(args)
   console.log(JSON.stringify({ runDir: result.runDir, h0: result.plan.h0, status: result.audit?.status || 'planned', personas: result.plan.personas, routes: result.plan.routes, qa: result.plan.qa }, null, 2))
 }

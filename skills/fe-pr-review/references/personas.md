@@ -20,7 +20,7 @@ Frontend source or stories usually add `accessibility-ui` and `rollout-gates`. F
 
 ## Native fan-out contract
 
-The Codex parent agent launches the first four selected built-in persona subagents concurrently. Launch remaining personas as slots free. At least two top-level reviewers must show material overlap in recorded timestamps. Agreement is not evidence. Do not invoke Cursor, Claude, Codex CLI, or another external model process for the native graph.
+The Codex parent agent launches the first four selected built-in persona subagents concurrently without model, reasoning-effort, or service-tier overrides, so every reviewer inherits the parent model. Launch remaining personas as slots free. If a host-selected optional native override fails for capacity or usage, retry once with the override omitted. At least two top-level reviewers must show material overlap in recorded timestamps. Agreement is not evidence. Do not invoke Cursor, Claude, Codex CLI, or another external model process for the native graph.
 
 Top-level reviewers are depth 1. Each may optionally launch no more than two focused probe children at depth 2:
 

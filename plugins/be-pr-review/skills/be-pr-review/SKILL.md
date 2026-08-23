@@ -59,11 +59,14 @@ Unknown topology is not permission to guess; assign `unverified` where it matter
 
 ```bash
 node .agents/skills/be-pr-review/scripts/review-graph.mjs run \
+  --portable-cli \
   --repo-root "$PWD" --base <base-ref> --head <source-ref> \
   --max-workers 4
 ```
 
 The runner selects 3–6 non-overlapping personas from [`references/personas.md`](references/personas.md), detects safe non-interactive Claude Code, Codex CLI, or Cursor Agent routes, fans reviewers out concurrently under `--max-workers`, validates their JSON, then gives surviving candidates to a separate synthesizer. Every reviewer receives the same snapshot and must return evidence for **every facet**. Missing or vague coverage is `UNVERIFIED`.
+
+`run` spawns external model CLIs, so it refuses to start without `--portable-cli`. That flag is the machine-enforced record of explicit user consent to spend external provider quota; a scheduled or native review must use `plan` plus native subagents instead, which inherit the parent model.
 
 Use `--runner cursor,codex,claude` and `--model <id>` only with advertised safe routes. Use `--dry-run` (implied by `plan`) to write the exact plan and per-persona commands without launching a runner. Never invent a model ID or weaken read-only flags.
 

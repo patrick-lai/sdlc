@@ -117,11 +117,11 @@ Use it when a frontend PR needs independent accessibility, rollout, privacy, rep
 /fe-pr-review review <pull-request-url> and use qa-demo
 ```
 
-The coordinator works with the authenticated forge integration already available to the agent. Its dependency-free graph runner snapshots one head, assigns 3–6 read-only personas across installed Claude Code, Codex CLI, and Cursor Agent routes, validates evidence for every declared facet, and runs a distinct synthesis node. Feature-gate review gets a prominent full-path trace from requirement decision through definition, evaluation, off/on behavior, exposure, SSR parity, rollback, tests, and cleanup. Visual proof stays with the installed `qa-demo` skill and is **opt-in**: run it only when the user explicitly asks, then attach the result with `--qa-report`. Default reviews skip the demo and report QA as `not-run`. Every completed attempt emits self-contained `report.json`, `report.md`, and `report.html` artifacts. Reports separate the code verdict from operational follow-ups, so routine owner checklists, QA tasks, rollout communication, and post-merge cleanup do not turn sound code into a false failure. Every follow-up has a machine-readable verdict impact, and mandatory safety or pre-approval evidence deterministically overrides an incorrect model pass. Runner exhaustion still produces an explicit `UNVERIFIED` report with all missing code facets instead of silently omitting evidence. The graph runner fails over safe routes, serializes Cursor authentication, isolates Claude from inherited MCP configuration, and never comments, approves, merges, pushes, commits, or deploys.
+The coordinator works with the authenticated forge integration already available to the agent. In Codex, it snapshots one head, launches 3–6 built-in read-only persona subagents plus a distinct synthesis subagent, and keeps every native spawn on the parent model by omitting model overrides. A host-selected optional native override that hits capacity is retried once on the parent model. External model CLIs are available only through explicit portable mode and are never a capacity fallback; `run` exits non-zero without `--portable-cli`, so external quota cannot be spent by accident. Feature-gate review gets a prominent full-path trace from requirement decision through definition, evaluation, off/on behavior, exposure, SSR parity, rollback, tests, and cleanup. Visual proof stays with the installed `qa-demo` skill and is **opt-in**: run it only when the user explicitly asks, then attach the result with `--qa-report`. Default reviews skip the demo and report QA as `not-run`. Every completed attempt emits self-contained `report.json`, `report.md`, and `report.html` artifacts. Reports separate the code verdict from operational follow-ups, so routine owner checklists, QA tasks, rollout communication, and post-merge cleanup do not turn sound code into a false failure. Every follow-up has a machine-readable verdict impact, and mandatory safety or pre-approval evidence deterministically overrides an incorrect model pass. Incomplete native evidence still produces an explicit `UNVERIFIED` report with all missing code facets instead of silently omitting evidence. The review remains read-only and never comments, approves, merges, pushes, commits, or deploys.
 
 ```bash
 node .agents/skills/fe-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main
-node .agents/skills/fe-pr-review/scripts/review-graph.mjs run --repo-root "$PWD" --base origin/main --dry-run
+node .agents/skills/fe-pr-review/scripts/review-graph.mjs run --portable-cli --repo-root "$PWD" --base origin/main --dry-run
 npm run test:fe-pr-review
 ```
 
@@ -137,7 +137,7 @@ The dependency-free graph runner snapshots one immutable head, chooses 3–6 bac
 
 ```bash
 node .agents/skills/be-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main
-node .agents/skills/be-pr-review/scripts/review-graph.mjs run --repo-root "$PWD" --base origin/main --dry-run
+node .agents/skills/be-pr-review/scripts/review-graph.mjs run --portable-cli --repo-root "$PWD" --base origin/main --dry-run
 npm run test:be-pr-review
 ```
 

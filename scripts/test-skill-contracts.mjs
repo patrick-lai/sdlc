@@ -177,10 +177,24 @@ for (const marker of [
   'pre-fix',
   'parent agent owns the native subagent graph',
   'must not invoke `cursor-agent`, `claude`, `codex`',
+  'inherit the parent model',
+  'retry once with those overrides omitted',
+  'Never use an external model CLI as a capacity fallback',
   'native-synthesis.json',
   'only when the user explicitly requests portable or external CLI review',
 ]) {
   assert.ok(feReview.includes(marker), `fe-pr-review missing public contract: ${marker}`)
+}
+
+// The portable `run` path spends external provider quota, so both graph runners must gate it
+// behind an explicit `--portable-cli` consent flag rather than prose alone.
+for (const skill of ['fe-pr-review', 'be-pr-review']) {
+  const runner = fs.readFileSync(path.join(root, `skills/${skill}/scripts/review-graph.mjs`), 'utf8')
+  assert.ok(runner.includes('export function assertPortableConsent'), `${skill} must export assertPortableConsent`)
+  assert.ok(runner.includes('assertPortableConsent(args)'), `${skill} must enforce portable consent at the CLI entry point`)
+  assert.ok(runner.includes('run --portable-cli'), `${skill} help must document run as requiring --portable-cli`)
+  const doc = fs.readFileSync(path.join(root, `skills/${skill}/SKILL.md`), 'utf8')
+  assert.ok(doc.includes('--portable-cli'), `${skill} SKILL.md must document the portable consent flag`)
 }
 
 const feContracts = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/contracts.md'), 'utf8')
@@ -213,6 +227,8 @@ for (const marker of [
   'Historical regression evidence',
   'pre-fix behavior',
   'parent-owned native fan-out is mandatory',
+  'Native reviewer, probe, and synthesis spawns inherit the parent model',
+  'External model CLIs are not a capacity fallback',
   'Native `plan` and `synthesize` perform no external model discovery or execution',
   'Portable CLI fallback is allowed only by explicit user request',
 ]) {
@@ -331,6 +347,8 @@ for (const marker of [
   'Automatic PR comments and Slack notifications are outside scheduled review',
   'parent agent owns the review graph and launches built-in subagents directly',
   'never substitutes Cursor, Claude, Codex CLI',
+  'inherits its parent model',
+  'Never use an external model runner as a capacity fallback',
   'unless the user explicitly requests portable CLI review',
 ]) assert.ok(review.includes(marker), `review missing unified routing contract: ${marker}`)
 

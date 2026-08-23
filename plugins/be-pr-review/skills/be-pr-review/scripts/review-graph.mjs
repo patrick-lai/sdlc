@@ -98,7 +98,7 @@ export function parseArgs(argv) {
     const token = rest[i]
     if (!token.startsWith('--')) throw new Error(`Unexpected argument: ${token}`)
     const key = token.slice(2).replace(/-([a-z])/g, (_, c) => c.toUpperCase())
-    if (key === 'dryRun') out[key] = true
+    if (key === 'dryRun' || key === 'portableCli') out[key] = true
     else {
       const value = rest[++i]
       if (value == null || value.startsWith('--')) throw new Error(`Missing value for ${token}`)
@@ -599,18 +599,29 @@ export async function runGraph(options, injected = {}) {
   return { runDir: created.runDir, plan, audit, synthesis, report }
 }
 
+export const PORTABLE_CONSENT_ERROR = '`run` spawns external model CLIs (Cursor, Claude, Codex CLI) and consumes external provider quota. It requires explicit `--portable-cli` consent. The default Codex path is `plan` plus native subagents plus `synthesize`, which inherits the parent model.'
+
+export function assertPortableConsent(args) {
+  if (args.command !== 'run') return args
+  if (args.portableCli === true) return args
+  if (args.dryRun === true) return args
+  throw new Error(PORTABLE_CONSENT_ERROR)
+}
+
 function help() {
   console.log(`be-pr-review graph runner (read-only; never comments, approves, merges, pushes, commits, or deploys)
 
 Usage:
   review-graph.mjs plan --repo-root DIR [--base REF] [--head REF] [--output DIR] [--personas a,b,c]
-  review-graph.mjs run --repo-root DIR [--base REF] [--head REF] [--output DIR]
+  review-graph.mjs run --portable-cli --repo-root DIR [--base REF] [--head REF] [--output DIR]
       [--personas a,b,c] [--runner cursor,codex,claude] [--model ID]
       [--max-workers N] [--verification-report FILE] [--dry-run]
   review-graph.mjs synthesize --run-dir DIR [--verification-report FILE] [--runner ...] [--model ID]
 
 Notes:
   plan always behaves as a dry run and launches no model.
+  run is the explicit portable CLI fallback and requires --portable-cli, because it spawns external model CLIs and consumes external provider quota.
+  The native Codex path is plan plus native subagents plus synthesize. It inherits the parent model, so it never exhausts an external provider.
   --output must be outside the reviewed repository.
   --verification-report takes a revision-bound JSON or Markdown verification report; --qa-report is a compatibility alias.`)
 }
@@ -622,6 +633,7 @@ async function main() {
   else if (args.command === 'synthesize') {
     if (!args.runDir) throw new Error('synthesize requires --run-dir')
   } else if (args.command !== 'run') throw new Error(`Unknown command: ${args.command}`)
+  assertPortableConsent(args)
   const result = await runGraph(args)
   console.log(JSON.stringify({ runDir: result.runDir, h0: result.plan.h0, status: result.audit?.status || 'planned', personas: result.plan.personas, routes: result.plan.routes, verification: result.plan.verification }, null, 2))
 }
