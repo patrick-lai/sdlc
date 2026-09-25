@@ -48,3 +48,13 @@ TypeSafe's official documentation describes [JEV's bounded decision role](https:
 For a new optimization, freeze cases and labels before trialling and preserve failed results. Measure fallback, rework and time to verified task completion before claiming a session-level speedup.
 
 [The frozen synthetic inputs, schedule and per-call results](evaluation.json) are included for audit. They are evidence, not runtime instructions.
+
+## Review latency follow-up
+
+A separate frozen twelve-pair review trial tested JEV as an advisory duplicate-root classifier: six development and six held-out cases, including ambiguity and embedded instructions. Four three-question batches took 253–285 ms each (1.076 seconds total; reported USD 0.000209664). All twelve labels matched; eleven met confidence 0.9, with zero accepted errors. These are synthetic, agent-authored labels. The raw cases and results are in CommissionAI `docs/evals/2026-09-26-jev-review.json`; its offline-by-default runner is `scripts/jev_review_eval.py`.
+
+Do not add a semantic grouping call to every review for speed. CommissionAI's existing location grouping retains every finding body and takes no inference call. The JEV trial established classification feasibility, not faster completed reviews. Any future advisory grouping must retain findings and scope coverage.
+
+An independent three-case file-explanation trial measured median Astra 6.982 seconds versus Luna 5.268 seconds. Both returned valid grounded explanations in these tiny cases, but Luna had substantially more cache hits. This supports trying an advertised fast model for bounded explanations; it does not establish a production speed guarantee or justify changing full-review specialists. A later context-trimming trial reduced input tokens but did not improve median latency. Full prompts, raw answers and limitations are in CommissionAI `docs/evals/2026-09-26-review-explanation.json` and `docs/review-speed.md`.
+
+The deterministic app improvements reuse one immutable diff-stat across specialist waves and fetch source/target refs together. The UI prepares one next authored file while the current explanation is read; it skips generated output and never cascades through the whole review. Queue time is included in utility deadlines. These changes reduce duplicated work or overlap waiting with reading; their end-to-end UI benefit remains unmeasured.
