@@ -1,0 +1,52 @@
+{
+  "material_defects": [
+    {
+      "id": "tenant-isolation",
+      "anchor": "documents.py:7",
+      "trigger": "Authenticated tenant requests another tenant document ID."
+    },
+    {
+      "id": "job-permit",
+      "anchor": "jobs.py:9",
+      "trigger": "Worker throws or is cancelled after acquiring the only permit."
+    },
+    {
+      "id": "wire-units",
+      "anchor": "pricing.py:2",
+      "trigger": "Invoice crosses unchanged cents API/client boundary."
+    },
+    {
+      "id": "search-order",
+      "anchor": "search.py:12",
+      "trigger": "Old search resolves after newer selection."
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "label-retirement",
+      "path": "client.py",
+      "expected": "The modern-only label is an explicitly required safe change."
+    }
+  ],
+  "existing_checks": "python3 -B checks.py passes in both revisions despite all four regressions.",
+  "coverage_assignments": {
+    "access": [
+      "documents.py",
+      "api.py document caller and session boundary"
+    ],
+    "runtime": [
+      "jobs.py",
+      "search.py",
+      "callers and lifecycle assumptions"
+    ],
+    "contracts": [
+      "pricing.py",
+      "api.py invoice boundary",
+      "client.py consumers and label cleanup"
+    ],
+    "coordinator": [
+      "Requirements and complete changed-file ownership",
+      "Verify candidates and ensure unchanged revision"
+    ]
+  }
+}

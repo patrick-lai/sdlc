@@ -17,8 +17,8 @@ npx skills add patrick-lai/sdlc
 | **review** | Review a working tree, current/own PR, explicit PR, or arbitrary branch; automatically route to frontend, backend, or both and return one verdict. |
 | **review-learn-from-me** | Learn high-precision tribal knowledge only from the authenticated user's decided review comments. |
 | **review-learn-from-all** | Learn team tribal knowledge from all verified human reviewers with complete pagination and bounded, resumable batches. |
-| **fe-pr-review** | One focused frontend review with optional parallel risk checks. Visual proof and the full reviewer graph are opt-in. |
-| **be-pr-review** | One focused backend review of affected contracts, data and runtime behavior. Full graph audits remain available by request. |
+| **fe-pr-review** | Focused parallel frontend specialists with shared evidence and complete risk ownership. Visual QA and the legacy runner are opt-in. |
+| **be-pr-review** | Focused parallel backend specialists across affected contracts, data and runtime behavior. The legacy runner remains opt-in. |
 | **second-opinion** | Cheap native-model second look at the current change via the host agent's own subagent. Explicit `/second-opinion`, or implicit when `AGENTS.md` says to use it for all sessions. |
 | **jev-fast-coding** | Reduce coding overhead with exact lookup, selective JEV discovery, result reuse and focused verification. Includes measured decision-level evidence and an optional CommissionAI adapter. |
 
@@ -107,11 +107,13 @@ Use one command whether the target is frontend, backend, or full-stack:
 /review origin/feature-branch
 ```
 
-The default comes from CommissionAI's scoped review approach: inspect one frozen diff against requirements, trace the relevant behavior, check suspected defects against the strongest safe explanation, and return one result. FE and BE share one workflow. Mixed changes do not launch two full reviews. The current reviewer handles ordinary changes; at most two native helpers investigate independent risks when that saves time. An existing host panel remains in charge of its models, scopes and size.
+The default uses focused native specialists in parallel. For substantial changes, divide material risks into several scopes, often three to six, and immediately launch as many as available host capacity permits. The coordinator reviews requirements and cross-boundary interactions while specialists trace their assignments. Every changed area has an owner. Failed or partial work remains outstanding until covered or disclosed. A tiny mechanical change can use fewer reviewers when there is no useful independent work to split.
 
-Ordinary reviews aim for about five minutes, with explicit gaps when a large or risky change needs more work. This is a work budget, not a measured speed guarantee. Default reviews do not launch a separate synthesis agent, render three report formats, traverse every historical defect category or run optional visual QA. They keep frozen revisions, dirty-worktree coverage, current-code evidence, root-cause deduplication and honest verification limits. Existing relevant review lessons remain useful probes.
+FE and BE share one snapshot, one coverage map and one verdict. An existing host panel remains in charge of its models, scopes and size. Speed comes from concurrent investigations, reused checks and the coordinator directly validating findings. There is no separate synthesis-agent stage or default report-rendering stage. About five minutes is a progress checkpoint, not a deadline that cuts review short.
 
-A full multi-persona graph and its audit artifacts are available only by explicit request. `qa-demo` is opt-in. Report publication and PR comments also require a request. [Workflow](skills/review/references/workflow.md) and [lenses](skills/review/references/lenses.md) describe the default.
+Keep frozen revisions, dirty-worktree coverage, disconfirming evidence, root-cause deduplication and every verified material finding. Existing relevant review lessons remain useful probes. A [small serial/parallel trial](fixtures/review-parallel/README.md) found the same four seeded defects in both modes; startup erased the parallel stage saving, so it is not proof of an overall speedup.
+
+The legacy runner and formal audit artifacts are available only by explicit request. `qa-demo` is opt-in. Report publication and PR comments also require a request. [Workflow](skills/review/references/workflow.md) and [lenses](skills/review/references/lenses.md) describe the default.
 
 ## review-learn-from-me and review-learn-from-all
 
@@ -141,9 +143,9 @@ These standalone entrypoints use the same focused workflow as `review`, with fro
 /be-pr-review origin/feature-branch
 ```
 
-Frontend lenses cover changed user flows, state, accessibility, dynamic values, client/server contracts and feature-gate behavior. Backend lenses cover changed API behavior, authorization, transactions, retries, concurrency, cancellation and migration compatibility. Inspect the risks the change affects; irrelevant facets do not require a report.
+Frontend lenses cover changed user flows, state, accessibility, dynamic values, client/server contracts and feature-gate behavior. Backend lenses cover changed API behavior, authorization, transactions, retries, concurrency, cancellation and migration compatibility. Assign the risks the change affects to concurrent specialists and an integration owner; irrelevant facets do not require a report.
 
-The dependency-free graph scripts remain available for an explicitly requested full audit. External model execution still requires explicit consent and `--portable-cli`; native review never switches to those runners as a capacity fallback. Existing graph/report regression suites remain in place.
+The dependency-free graph scripts remain available for an explicitly requested legacy graph or formal audit contract. External model execution still requires explicit consent and `--portable-cli`; native review never switches to those runners as a capacity fallback. Existing graph/report regression suites remain in place.
 
 ## second-opinion
 

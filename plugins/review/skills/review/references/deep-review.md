@@ -1,6 +1,6 @@
-# Explicit graph audit only
+# Legacy graph and artifact workflow only
 
-This is the optional, slower graph workflow. Read it only when the user explicitly requests the full multi-persona graph or its audit artifacts. It does not define ordinary, scheduled, frontend, or backend review defaults. The host still owns models, quotas and any existing panel.
+This reference describes the optional legacy runner and its formal audit artifacts. Read it only when explicitly requested. Ordinary native parallel specialists use the shared workflow and do not need these runner, synthesis-node or report requirements. The host still owns models, quotas and any existing panel.
 
 # review
 

@@ -1,7 +1,7 @@
 {
   "name": "be-pr-review",
-  "description": "Focused backend review of changed API, data and runtime behavior. Full graph audits are opt-in.",
-  "version": "0.2.0",
+  "description": "Parallel backend review specialists across affected contracts, data and runtime behavior, with explicit integration coverage.",
+  "version": "0.2.1",
   "author": {
     "name": "Patrick Lai",
     "url": "https://github.com/patrick-lai"

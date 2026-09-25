@@ -1,7 +1,7 @@
 {
   "name": "review",
-  "description": "Focused read-only review of working trees, branches and PRs with one shared verdict and optional parallel risk checks.",
-  "version": "0.2.0",
+  "description": "Thorough review through focused native specialists in parallel, shared evidence and explicit coverage ownership.",
+  "version": "0.2.1",
   "author": {
     "name": "Patrick Lai",
     "url": "https://github.com/patrick-lai"

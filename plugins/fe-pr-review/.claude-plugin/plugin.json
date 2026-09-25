@@ -1,7 +1,7 @@
 {
   "name": "fe-pr-review",
-  "description": "Focused frontend review of changed behavior, accessibility and contracts. Full graph audits and visual QA are opt-in.",
-  "version": "0.2.0",
+  "description": "Parallel frontend review specialists with focused risk assignments and one evidence-backed verdict. Visual QA remains opt-in.",
+  "version": "0.2.1",
   "author": {
     "name": "Patrick Lai",
     "url": "https://github.com/patrick-lai"

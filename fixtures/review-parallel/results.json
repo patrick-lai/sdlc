@@ -1,0 +1,78 @@
+{
+  "date": "2026-09-26",
+  "time_zone_for_timestamps": "UTC",
+  "base": "3536c43ffb379b6de2d9a5e647384d8e32fc39cc",
+  "head": "2dffc0b57977538e7ed9ea0539375e1e4e567673",
+  "method": "One fresh native single-agent reference followed by three fresh native specialists on identical frozen synthetic source. Workers did not see the oracle or prior reports. Specialist scopes were supplied by the coordinator. Same inherited model/settings; no external model CLIs.",
+  "reference": {
+    "start": "2026-09-25T15:36:27Z",
+    "end": "2026-09-25T15:38:11Z",
+    "elapsed_seconds": 104,
+    "reviewers": 1,
+    "shell_calls": 15,
+    "found": [
+      "tenant-isolation",
+      "job-permit",
+      "wire-units",
+      "search-order"
+    ],
+    "false_positives": 0
+  },
+  "parallel": {
+    "dispatch_start": "2026-09-25T15:38:53Z",
+    "specialists": [
+      {
+        "scope": "access",
+        "start": "2026-09-25T15:39:24Z",
+        "end": "2026-09-25T15:40:00Z",
+        "elapsed_seconds": 36,
+        "shell_calls": 4,
+        "found": [
+          "tenant-isolation"
+        ]
+      },
+      {
+        "scope": "runtime",
+        "start": "2026-09-25T15:39:34Z",
+        "end": "2026-09-25T15:41:01Z",
+        "elapsed_seconds": 87,
+        "shell_calls": 11,
+        "found": [
+          "job-permit",
+          "search-order"
+        ]
+      },
+      {
+        "scope": "contracts",
+        "start": "2026-09-25T15:39:41Z",
+        "end": "2026-09-25T15:40:26Z",
+        "elapsed_seconds": 45,
+        "shell_calls": 4,
+        "found": [
+          "wire-units"
+        ]
+      }
+    ],
+    "specialist_stage_span_seconds": 97,
+    "dispatch_to_last_specialist_end_seconds": 128,
+    "coordinator_validation_checkpoint": "2026-09-25T15:41:50Z",
+    "dispatch_to_coordinator_checkpoint_seconds": 177,
+    "false_positives": 0,
+    "coverage_gaps": []
+  },
+  "checks": [
+    "Existing happy-path checks pass despite four seeded defects.",
+    "Each defect reproduced against base and head using focused standard-library probes.",
+    "Both modes accept the intentional checkout label cleanup.",
+    "Frozen head and clean working tree checked after review."
+  ],
+  "limits": [
+    "One small synthetic fixture and one run per mode; no statistical recall or production latency estimate.",
+    "Parallel reviewer stage excludes launch and parent verification. It must not be presented as end-to-end speed.",
+    "Observed launch and coordination erased the 7-second specialist-stage saving; this is not a demonstrated overall speedup.",
+    "The parent also performed skill-editing and validation work while the panel ran, so its 177-second checkpoint is not a controlled pure-review measurement.",
+    "Manually supplied specialist scopes test assigned review quality, not automatic scope selection.",
+    "No token or dollar cost measurement; more agents can increase both.",
+    "The two older solo trials are historical evidence for the prior policy only."
+  ]
+}

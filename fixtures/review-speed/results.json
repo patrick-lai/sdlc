@@ -31,5 +31,7 @@
     "No timed baseline run of the old review graph.",
     "No evidence about large PRs, real review recall, production latency or overall coding-session speed.",
     "Five-minute ordinary-review budget is a policy target, not a measured guarantee."
-  ]
+  ],
+  "policy_revision": "af816b0",
+  "status": "Historical solo-default trial; superseded by parallel specialist default. Timings do not validate the newer policy."
 }
