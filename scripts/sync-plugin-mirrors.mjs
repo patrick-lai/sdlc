@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const regularSkills = ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion']
+const regularSkills = ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']
 const reviewLearningVariants = ['review-learn-from-me', 'review-learn-from-all']
 const reviewLearningContract = path.join(root, 'templates/review-learn-contract.md')
 const agentPath = path.join(root, 'plugins/second-opinion/agents/second-opinion.md')
@@ -52,7 +52,7 @@ for (const name of regularSkills) {
   const src = path.join(root, 'skills', name)
   const dest = path.join(root, 'plugins', name, 'skills', name)
   fs.rmSync(dest, { recursive: true, force: true })
-  fs.cpSync(src, dest, { recursive: true })
+  fs.cpSync(src, dest, { recursive: true, filter: (source) => !['.pr-warden-ledger.json', '.pr-warden-state.json', '.pr-warden-report.html'].includes(path.basename(source)) })
 }
 
 const reviewLearningPluginSkills = path.join(root, 'plugins/review-learn/skills')

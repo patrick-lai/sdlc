@@ -9,6 +9,7 @@ import { mergeAccessibilityScans, assertNoBlockingViolations } from '../skills/q
 import { resolveSmokeMode } from '../skills/qa-demo/scripts/smoke-target.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const runtimeArtifacts = new Set(['.pr-warden-ledger.json', '.pr-warden-state.json', '.pr-warden-report.html'])
 
 function filesUnder(dir) {
   const out = []
@@ -24,8 +25,9 @@ function assertMirror(name) {
   const canonical = path.join(root, 'skills', name)
   const plugin = path.join(root, 'plugins', name, 'skills', name)
   const relative = (base) => filesUnder(base).map((file) => path.relative(base, file))
-  assert.deepEqual(relative(plugin), relative(canonical), `${name} plugin file list drifted`)
-  for (const file of relative(canonical)) {
+  const canonicalFiles = relative(canonical).filter((file) => !runtimeArtifacts.has(path.basename(file)))
+  assert.deepEqual(relative(plugin), canonicalFiles, `${name} plugin file list drifted`)
+  for (const file of canonicalFiles) {
     assert.deepEqual(
       fs.readFileSync(path.join(plugin, file)),
       fs.readFileSync(path.join(canonical, file)),
@@ -34,7 +36,7 @@ function assertMirror(name) {
   }
 }
 
-for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion']) assertMirror(name)
+for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']) assertMirror(name)
 
 const reviewLearningVariants = ['review-learn-from-me', 'review-learn-from-all']
 const reviewLearningContractPath = path.join(root, 'templates/review-learn-contract.md')
@@ -66,6 +68,7 @@ const publicFiles = publicRoots
     return fs.statSync(file).isDirectory() ? filesUnder(file) : [file]
   })
   .filter((file) => textExtensions.has(path.extname(file)))
+  .filter((file) => !(file.startsWith(`${path.join(root, 'skills')}${path.sep}`) && runtimeArtifacts.has(path.basename(file))))
 const banned = [
   /\btwg\b/i,
   /\bRaphael\b/i,
@@ -453,7 +456,7 @@ assert.equal(Object.keys(pkg.devDependencies || {}).length, 0, 'skills must stay
 // Marketplace entries must resolve to a real plugin with a matching manifest.
 const marketplace = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin/marketplace.json'), 'utf8'))
 const marketplaceNames = marketplace.plugins.map((entry) => entry.name)
-for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion']) {
+for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']) {
   assert.ok(marketplaceNames.includes(name), `marketplace missing plugin ${name}`)
   const entry = marketplace.plugins.find((plugin) => plugin.name === name)
   assert.equal(entry.source, `./plugins/${name}`)
@@ -576,7 +579,7 @@ try {
   }
   write('scripts/sync-plugin-mirrors.mjs', syncSrc)
   write('templates/review-learn-contract.md', '# contract\n')
-  for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion']) {
+  for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']) {
     write(`skills/${name}/SKILL.md`, `# ${name}\n`)
   }
   write('skills/review-learn-from-me/SKILL.md', '# from me\n')
@@ -601,6 +604,29 @@ try {
     false,
     'failed sync must not generate canonical references before preflight completes',
   )
+
+  write('skills/review-learn-from-all/SKILL.md', '# from all\n')
+  for (const file of runtimeArtifacts) {
+    write(`skills/pr-warden/${file}`, 'private runtime data\n')
+    write(`skills/pr-warden/references/${file}`, 'nested private runtime data\n')
+    write(`plugins/pr-warden/skills/pr-warden/${file}`, 'old private runtime data\n')
+  }
+  write('skills/pr-warden/references/guide.md', '# public guide\n')
+  const completedSync = spawnSync(process.execPath, [path.join(syncFixture, 'scripts/sync-plugin-mirrors.mjs')], {
+    cwd: syncFixture,
+    encoding: 'utf8',
+  })
+  assert.equal(completedSync.status, 0, `${completedSync.stdout}\n${completedSync.stderr}`)
+  const mirroredWarden = path.join(syncFixture, 'plugins/pr-warden/skills/pr-warden')
+  assert.deepEqual(
+    filesUnder(mirroredWarden).map((file) => path.relative(mirroredWarden, file)),
+    ['SKILL.md', path.join('references', 'guide.md')],
+    'sync must copy public files while excluding current, nested and stale runtime artifacts',
+  )
+  for (const file of runtimeArtifacts) {
+    assert.equal(fs.readFileSync(path.join(syncFixture, 'skills/pr-warden', file), 'utf8'), 'private runtime data\n')
+    assert.equal(fs.readFileSync(path.join(syncFixture, 'skills/pr-warden/references', file), 'utf8'), 'nested private runtime data\n')
+  }
 } finally {
   fs.rmSync(syncFixture, { recursive: true, force: true })
 }

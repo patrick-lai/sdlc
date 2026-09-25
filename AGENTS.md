@@ -42,7 +42,7 @@ Claude Code plugin marketplace:
 /plugin install second-opinion@sdlc
 ```
 
-Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`, `skills/fe-pr-review/`, `skills/be-pr-review/`, `skills/review/`, `skills/review-learn-from-me/`, `skills/review-learn-from-all/`, `skills/second-opinion/`. Plugin mirrors under `plugins/` (keep in sync after skill edits).
+Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`, `skills/fe-pr-review/`, `skills/be-pr-review/`, `skills/review/`, `skills/review-learn-from-me/`, `skills/review-learn-from-all/`, `skills/second-opinion/`, `skills/jev-fast-coding/`. Plugin mirrors under `plugins/` (keep in sync after skill edits).
 
 ## Repo map
 
@@ -64,3 +64,4 @@ Canonical skill sources in-repo: `skills/qa-demo/`, `skills/pr-warden/`, `skills
 7. For **review-learn-from-me/all**: author the shared evidence and persistence rules in `templates/review-learn-contract.md`, then run `npm run sync:plugins` to refresh both skills and the combined Claude plugin. With no explicit PR, both modes must freeze the operator's 15 most recently reviewed PRs by latest qualifying review-event timestamp, never endpoint order or PR update time. `from-me` must match the authenticated provider identity exactly; `from-all` must page every thread and batch without silent truncation. Both admit only decided human outcomes verified against final code, prefer Leyline, keep `.agents/review-learnings.md` canonical and deduplicated, and never infer acceptance from resolved/merged/approval wording alone.
 8. For **second-opinion**: stay on the host's native subagent and native cheap model. No cross-vendor spawn. Reviewer is read-only; the parent triages ACCEPT or DISMISS.
 9. Keep project skill installs on **`.agents/skills/`**; use **`.claude`** only for Claude-specific packaging or compatibility links.
+10. Keep portable workflow instructions here and host-specific commands and orchestration in optional adapters. `jev-fast-coding` must preserve its synthetic evidence and limitations; never turn helper latency into an unmeasured whole-session speed claim.

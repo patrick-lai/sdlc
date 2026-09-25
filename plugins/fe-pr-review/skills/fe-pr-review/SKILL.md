@@ -28,6 +28,10 @@ The skill owns the review harness. Scheduled prompts should identify the eligibl
 - Native reviewer, probe, and synthesis spawns inherit the parent model. Omit model, reasoning-effort, and service-tier overrides. If an optional native override was selected by the host and fails for capacity or usage, retry once with those overrides omitted so the parent model is used. Never use an external model CLI as a capacity fallback.
 - Never merge. Never post automatic PR comments or Slack notifications. Those actions require a separate explicit request and a fresh provider-state check.
 
+## Installed paths
+
+The command examples use a project install at `.agents/skills/fe-pr-review`. Resolve that prefix from the actual directory containing this `SKILL.md` before running them. A global or plugin install may live elsewhere; keep the reviewed repository as the working directory and pass the installed script by its resolved absolute path.
+
 ## 1. Scheduled batch admission
 
 Scheduled batch mode is the only multi-PR mode:

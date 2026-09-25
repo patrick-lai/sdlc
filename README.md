@@ -20,6 +20,7 @@ npx skills add patrick-lai/sdlc
 | **fe-pr-review** | Fan out 3–6 read-only frontend review personas and synthesize their evidence. `qa-demo` is opt-in visual proof, not part of the default review. |
 | **be-pr-review** | Fan out 3–6 backend reviewers across contracts, data, reliability, security, performance, tests, and rollout, then adversarially synthesize revision-bound evidence. |
 | **second-opinion** | Cheap native-model second look at the current change via the host agent's own subagent. Explicit `/second-opinion`, or implicit when `AGENTS.md` says to use it for all sessions. |
+| **jev-fast-coding** | Reduce coding overhead with exact lookup, selective JEV discovery, result reuse and focused verification. Includes measured decision-level evidence and an optional CommissionAI adapter. |
 
 ## Install
 
@@ -44,6 +45,7 @@ npx skills add patrick-lai/sdlc --skill review -a cursor -y
 npx skills add patrick-lai/sdlc --skill review-learn-from-me -a cursor -y
 npx skills add patrick-lai/sdlc --skill review-learn-from-all -a cursor -y
 npx skills add patrick-lai/sdlc --skill second-opinion -a cursor -y
+npx skills add patrick-lai/sdlc --skill jev-fast-coding -a cursor -y
 # equivalent project root for codex-only auto-detect:
 # npx skills add patrick-lai/sdlc --skill pr-warden -a codex -y
 
@@ -72,7 +74,27 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 /plugin install review@sdlc
 /plugin install review-learn@sdlc
 /plugin install second-opinion@sdlc
+/plugin install jev-fast-coding@sdlc
 ```
+
+## Managed portable skills
+
+`skills/` is the canonical source for the portable workflows. The review family, QA, PR Warden, second opinion and JEV guidance belong here. App-specific authentication, commands, roles and orchestration remain in the host app's adapter. Third-party skills keep their upstream ownership.
+
+For a user-wide install shared with supported agents:
+
+```bash
+npx skills add patrick-lai/sdlc --skill jev-fast-coding review fe-pr-review be-pr-review review-learn-from-me review-learn-from-all second-opinion qa-demo pr-warden -g -a codex -y
+npx skills update jev-fast-coding review fe-pr-review be-pr-review -g -y
+```
+
+The skills installer records source provenance for future updates. CommissionAI can also install the canonical `skills/` tree through its managed pack loader. Its loader preserves existing user-owned installs, so keep one owner for each installed skill and retain a backup when changing ownership. Installing a pack does not authorize external writes or change the host's model, quota, review or landing rules.
+
+## jev-fast-coding
+
+Use exact identifiers and local search first. Add semantic decisions where they replace expensive discovery, reuse unchanged results, and batch independent questions only when the existing client supports them. The skill needs no provider setup or extra inference call on ordinary coding turns.
+
+Its frozen 80-request synthetic trial measured three independent decisions at 270 ms batched versus 801 ms sequentially, with the same label matches. This establishes a helper-level gain, not a whole-session speedup. [Evidence and limitations](skills/jev-fast-coding/references/evidence.md) include the negative latency result for removing irrelevant history and the unmeasured fallback cost. CommissionAI-specific commands live in an optional reference.
 
 ## review
 

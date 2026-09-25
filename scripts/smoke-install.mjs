@@ -19,7 +19,7 @@ function run(command, args) {
 
 try {
   fs.writeFileSync(path.join(temp, 'package.json'), '{"name":"sdlc-install-smoke","private":true}\n')
-  for (const skill of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review', 'review-learn-from-me', 'review-learn-from-all', 'second-opinion']) {
+  for (const skill of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review', 'review-learn-from-me', 'review-learn-from-all', 'second-opinion', 'jev-fast-coding']) {
     run('npx', ['-y', 'skills', 'add', root, '--skill', skill, '-a', 'cursor', '-y'])
     assert.ok(fs.existsSync(path.join(temp, '.agents', 'skills', skill, 'SKILL.md')))
   }
@@ -61,7 +61,7 @@ try {
   assert.ok(fs.existsSync(path.join(temp, '.agents/skills/second-opinion/references/reviewer.md')))
   assert.ok(fs.existsSync(path.join(temp, '.agents/skills/second-opinion/references/hosts.md')))
 
-  console.log(`PASS: installed pr-warden + qa-demo + fe-pr-review + be-pr-review + review + review-learn-from-me + review-learn-from-all + second-opinion into ${path.join(temp, '.agents/skills')}`)
+  console.log(`PASS: installed pr-warden + qa-demo + fe-pr-review + be-pr-review + review + review-learn-from-me + review-learn-from-all + second-opinion + jev-fast-coding into ${path.join(temp, '.agents/skills')}`)
 } finally {
   fs.rmSync(temp, { recursive: true, force: true })
 }

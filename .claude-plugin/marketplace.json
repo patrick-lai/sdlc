@@ -5,8 +5,8 @@
     "url": "https://github.com/patrick-lai"
   },
   "metadata": {
-    "description": "SDLC agent skills for Claude Code — QA demos, portable PR Warden, and more",
-    "version": "0.5.0",
+    "description": "SDLC agent skills for Claude Code \u2014 QA demos, portable PR Warden, and more",
+    "version": "0.6.0",
     "pluginRoot": "./plugins"
   },
   "plugins": [
@@ -77,7 +77,7 @@
       "name": "fe-pr-review",
       "source": "./plugins/fe-pr-review",
       "description": "Provider-neutral frontend PR review with read-only multi-agent fan-out and synthesis. qa-demo visual proof is opt-in.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Patrick Lai",
         "url": "https://github.com/patrick-lai"
@@ -108,7 +108,7 @@
       "name": "be-pr-review",
       "source": "./plugins/be-pr-review",
       "description": "Provider-neutral backend PR review with immutable snapshots, read-only multi-agent fan-out, adversarial synthesis, and revision-bound verification.",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": {
         "name": "Patrick Lai",
         "url": "https://github.com/patrick-lai"
@@ -225,6 +225,32 @@
       ],
       "skills": [
         "./skills/second-opinion"
+      ]
+    },
+    {
+      "name": "jev-fast-coding",
+      "source": "./plugins/jev-fast-coding",
+      "description": "Reduce coding overhead with direct lookup, selective JEV discovery, result reuse and focused verification.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Patrick Lai",
+        "url": "https://github.com/patrick-lai"
+      },
+      "repository": "https://github.com/patrick-lai/sdlc",
+      "license": "MIT",
+      "keywords": [
+        "jev",
+        "coding-speed",
+        "verification"
+      ],
+      "category": "productivity",
+      "tags": [
+        "jev",
+        "coding",
+        "verification"
+      ],
+      "skills": [
+        "./skills/jev-fast-coding"
       ]
     }
   ]

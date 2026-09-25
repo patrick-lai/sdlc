@@ -1,0 +1,16 @@
+{
+  "name": "jev-fast-coding",
+  "description": "Reduce coding-session overhead with selective JEV discovery and evidence-based verification.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "repository": "https://github.com/patrick-lai/sdlc",
+  "license": "MIT",
+  "keywords": [
+    "jev",
+    "coding-speed",
+    "verification"
+  ]
+}

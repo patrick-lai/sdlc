@@ -22,6 +22,10 @@ Coordinate a high-signal backend PR review without depending on one forge, compa
 
 ## Workflow
 
+### Installed paths
+
+The command examples use a project install at `.agents/skills/be-pr-review`. Resolve that prefix from the actual directory containing this `SKILL.md` before running them. A global or plugin install may live elsewhere; keep the reviewed repository as the working directory and pass the installed script by its resolved absolute path.
+
 ### 1. Admit and snapshot one PR
 
 Use whichever authenticated forge integration is available. Confirm the PR is open, non-draft, reviewable by the user, and not already approved by them when that matters. Fetch the complete diff, current head, checks, threads, ticket/spec, repository instructions, ownership, and surrounding code. Process one PR at a time.

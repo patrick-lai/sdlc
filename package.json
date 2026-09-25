@@ -1,6 +1,6 @@
 {
   "name": "@patrick-lai/sdlc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SDLC agent skills for Claude Code and Codex \u2014 install with npx skills add patrick-lai/sdlc",
   "license": "MIT",
   "type": "module",
@@ -40,14 +40,19 @@
     "review-learn-from-all",
     "tribal-knowledge",
     "leyline",
-    "second-opinion"
+    "second-opinion",
+    "jev",
+    "coding-speed"
   ],
   "files": [
     "skills",
     "plugins",
     ".claude-plugin",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "!**/.pr-warden-ledger.json",
+    "!**/.pr-warden-state.json",
+    "!**/.pr-warden-report.html"
   ],
   "engines": {
     "node": ">=20"
