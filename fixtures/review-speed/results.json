@@ -1,0 +1,35 @@
+{
+  "date": "2026-09-26",
+  "method": "One native reviewer, sequential independent local targets, hidden oracle, unchanged heads, no helpers or external model CLIs. Timings are wall-clock per case, not a paired comparison against the old workflow.",
+  "cases": [
+    {
+      "name": "case-a",
+      "expected": "BLOCKED",
+      "actual": "BLOCKED",
+      "defect": "tenant omitted from cache key",
+      "elapsed_seconds": 37,
+      "tool_calls": 4,
+      "helpers": 0,
+      "verification": "Existing test passes; focused base/head reproduction proves cross-tenant leak at head."
+    },
+    {
+      "name": "case-b",
+      "expected": "PASSABLE",
+      "actual": "PASSABLE",
+      "elapsed_seconds": 26,
+      "tool_calls": 3,
+      "helpers": 0,
+      "verification": "Existing test and focused enabled/disabled/absent flag, auth, empty cart and single-save checks pass."
+    }
+  ],
+  "instruction_words": {
+    "previous_fullstack_entrypoints": 5757,
+    "new_review_entrypoint_workflow_and_lenses": 1298
+  },
+  "limits": [
+    "Two small synthetic cases, one reviewer, no statistical speed estimate.",
+    "No timed baseline run of the old review graph.",
+    "No evidence about large PRs, real review recall, production latency or overall coding-session speed.",
+    "Five-minute ordinary-review budget is a policy target, not a measured guarantee."
+  ]
+}

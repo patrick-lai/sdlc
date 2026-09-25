@@ -1,6 +1,6 @@
 {
   "name": "@patrick-lai/sdlc",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SDLC agent skills for Claude Code and Codex \u2014 install with npx skills add patrick-lai/sdlc",
   "license": "MIT",
   "type": "module",

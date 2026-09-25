@@ -1,7 +1,7 @@
 {
   "name": "be-pr-review",
-  "description": "Provider-neutral backend PR review with read-only multi-agent fan-out, adversarial synthesis, and revision-bound verification evidence.",
-  "version": "0.1.1",
+  "description": "Focused backend review of changed API, data and runtime behavior. Full graph audits are opt-in.",
+  "version": "0.2.0",
   "author": {
     "name": "Patrick Lai",
     "url": "https://github.com/patrick-lai"

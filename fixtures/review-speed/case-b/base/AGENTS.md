@@ -1,0 +1,1 @@
+Retire newCheckout by keeping its true branch for every caller. Authentication and cart validation remain in the API. The public checkout signature stays compatible. No external rollout checks are required for this fixture.

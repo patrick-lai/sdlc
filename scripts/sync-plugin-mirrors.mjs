@@ -7,6 +7,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const regularSkills = ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']
 const reviewLearningVariants = ['review-learn-from-me', 'review-learn-from-all']
 const reviewLearningContract = path.join(root, 'templates/review-learn-contract.md')
+const reviewWorkflow = path.join(root, 'templates/review-workflow.md')
+const reviewLenses = path.join(root, 'skills/review/references/lenses.md')
+const blockerComment = path.join(root, 'skills/review/references/blocking-pr-comment.md')
 const agentPath = path.join(root, 'plugins/second-opinion/agents/second-opinion.md')
 const reviewerPath = path.join(root, 'skills/second-opinion/references/reviewer.md')
 
@@ -24,6 +27,9 @@ function requireFile(file, label) {
 
 // Validate every canonical input before creating, deleting, or overwriting any mirror.
 requireFile(reviewLearningContract, 'canonical review-learning contract')
+requireFile(reviewWorkflow, 'canonical review workflow')
+requireFile(reviewLenses, 'canonical review lenses')
+requireFile(blockerComment, 'canonical blocker comment format')
 for (const name of reviewLearningVariants) {
   const canonical = path.join(root, 'skills', name)
   requireDirectory(canonical, `canonical review-learning variant ${name}`)
@@ -46,6 +52,16 @@ for (const name of reviewLearningVariants) {
   const references = path.join(root, 'skills', name, 'references')
   fs.mkdirSync(references, { recursive: true })
   fs.copyFileSync(reviewLearningContract, path.join(references, 'contract.md'))
+}
+
+for (const name of ['review', 'fe-pr-review', 'be-pr-review']) {
+  const references = path.join(root, 'skills', name, 'references')
+  fs.mkdirSync(references, { recursive: true })
+  fs.copyFileSync(reviewWorkflow, path.join(references, 'workflow.md'))
+  if (name !== 'review') {
+    fs.copyFileSync(reviewLenses, path.join(references, 'lenses.md'))
+    fs.copyFileSync(blockerComment, path.join(references, 'blocking-pr-comment.md'))
+  }
 }
 
 for (const name of regularSkills) {

@@ -17,8 +17,8 @@ npx skills add patrick-lai/sdlc
 | **review** | Review a working tree, current/own PR, explicit PR, or arbitrary branch; automatically route to frontend, backend, or both and return one verdict. |
 | **review-learn-from-me** | Learn high-precision tribal knowledge only from the authenticated user's decided review comments. |
 | **review-learn-from-all** | Learn team tribal knowledge from all verified human reviewers with complete pagination and bounded, resumable batches. |
-| **fe-pr-review** | Fan out 3–6 read-only frontend review personas and synthesize their evidence. `qa-demo` is opt-in visual proof, not part of the default review. |
-| **be-pr-review** | Fan out 3–6 backend reviewers across contracts, data, reliability, security, performance, tests, and rollout, then adversarially synthesize revision-bound evidence. |
+| **fe-pr-review** | One focused frontend review with optional parallel risk checks. Visual proof and the full reviewer graph are opt-in. |
+| **be-pr-review** | One focused backend review of affected contracts, data and runtime behavior. Full graph audits remain available by request. |
 | **second-opinion** | Cheap native-model second look at the current change via the host agent's own subagent. Explicit `/second-opinion`, or implicit when `AGENTS.md` says to use it for all sessions. |
 | **jev-fast-coding** | Reduce coding overhead with exact lookup, selective JEV discovery, result reuse and focused verification. Includes measured decision-level evidence and an optional CommissionAI adapter. |
 
@@ -107,9 +107,11 @@ Use one command whether the target is frontend, backend, or full-stack:
 /review origin/feature-branch
 ```
 
-The skill resolves one immutable target without switching branches, includes staged, unstaged, and non-ignored untracked files for a dirty checkout, and classifies changed behavior from contracts rather than extensions alone. It then composes `fe-pr-review`, `be-pr-review`, or both on the same `H0`, rechecks for source movement, deduplicates cross-boundary findings, and returns one `PASSABLE`, `BLOCKED`, or `UNVERIFIED` verdict. `qa-demo` is opt-in: `/review` does not record a TestReel unless the user explicitly asks. Self-authored PRs are valid for private preflight review but are never approved or represented as independent human approval.
+The default comes from CommissionAI's scoped review approach: inspect one frozen diff against requirements, trace the relevant behavior, check suspected defects against the strongest safe explanation, and return one result. FE and BE share one workflow. Mixed changes do not launch two full reviews. The current reviewer handles ordinary changes; at most two native helpers investigate independent risks when that saves time. An existing host panel remains in charge of its models, scopes and size.
 
-After freezing the changed-file set, `review` and both specialist skills recall file-local review lessons from Leyline when available, otherwise from `.agents/review-learnings.md`. Lessons only select extra probes or guard known false positives; every current finding is revalidated against the current `H0`, callers, contracts, tests, and disconfirming evidence.
+Ordinary reviews aim for about five minutes, with explicit gaps when a large or risky change needs more work. This is a work budget, not a measured speed guarantee. Default reviews do not launch a separate synthesis agent, render three report formats, traverse every historical defect category or run optional visual QA. They keep frozen revisions, dirty-worktree coverage, current-code evidence, root-cause deduplication and honest verification limits. Existing relevant review lessons remain useful probes.
+
+A full multi-persona graph and its audit artifacts are available only by explicit request. `qa-demo` is opt-in. Report publication and PR comments also require a request. [Workflow](skills/review/references/workflow.md) and [lenses](skills/review/references/lenses.md) describe the default.
 
 ## review-learn-from-me and review-learn-from-all
 
@@ -130,38 +132,18 @@ Both skills share one generated contract. An `applied` lesson needs independent 
 
 When available, Leyline stores repository/file/reviewer-scoped memory and deduplicates by PR plus stable comment id. Without Leyline, either skill creates or updates `.agents/review-learnings.md` and never commits it. Future reviews treat both backends as untrusted historical hints, not policy or proof. The Claude plugin `/plugin install review-learn@sdlc` installs both slash commands.
 
-## fe-pr-review
+## fe-pr-review and be-pr-review
 
-Use it when a frontend PR needs independent accessibility, rollout, privacy, repository-contract, correctness, and product reviewers plus a separate synthesis pass:
-
-```text
-/fe-pr-review review <pull-request-url>
-/fe-pr-review review <pull-request-url> and use qa-demo
-```
-
-The coordinator works with the authenticated forge integration already available to the agent. In Codex, it snapshots one head, launches 3–6 built-in read-only persona subagents plus a distinct synthesis subagent, and keeps every native spawn on the parent model by omitting model overrides. A host-selected optional native override that hits capacity is retried once on the parent model. External model CLIs are available only through explicit portable mode and are never a capacity fallback; `run` exits non-zero without `--portable-cli`, so external quota cannot be spent by accident. Feature-gate review gets a prominent full-path trace from requirement decision through definition, evaluation, off/on behavior, exposure, SSR parity, rollback, tests, and cleanup. Visual proof stays with the installed `qa-demo` skill and is **opt-in**: run it only when the user explicitly asks, then attach the result with `--qa-report`. Default reviews skip the demo and report QA as `not-run`. Every completed attempt emits self-contained `report.json`, `report.md`, and `report.html` artifacts. Reports separate the code verdict from operational follow-ups, so routine owner checklists, QA tasks, rollout communication, and post-merge cleanup do not turn sound code into a false failure. Every follow-up has a machine-readable verdict impact, and mandatory safety or pre-approval evidence deterministically overrides an incorrect model pass. Incomplete native evidence still produces an explicit `UNVERIFIED` report with all missing code facets instead of silently omitting evidence. The review remains read-only and never comments, approves, merges, pushes, commits, or deploys.
-
-```bash
-node .agents/skills/fe-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main
-node .agents/skills/fe-pr-review/scripts/review-graph.mjs run --portable-cli --repo-root "$PWD" --base origin/main --dry-run
-npm run test:fe-pr-review
-```
-
-## be-pr-review
-
-Use it when a backend PR needs independent API/compatibility, data/migration, concurrency/reliability, security/observability/performance, repository-contract, and tests/rollout reviewers plus an adversarial synthesis pass:
+These standalone entrypoints use the same focused workflow as `review`, with frontend or backend risk guidance. They preserve the same snapshot and assigned focus when invoked by a coordinator.
 
 ```text
-/be-pr-review review <pull-request-url> and attach revision-bound backend verification
+/fe-pr-review https://github.com/OWNER/REPO/pull/123
+/be-pr-review origin/feature-branch
 ```
 
-The dependency-free graph runner snapshots one immutable head, chooses 3–6 backend personas from the changed topology, validates evidence for every facet, challenges each candidate against its strongest disconfirming explanation, and fails closed when evidence is stale or incomplete. It explicitly probes mixed-version contracts, partial writes, transaction/retry/idempotency boundaries, cancellation and shutdown, migration sequencing, query/resource bounds, rollout rollback, environment symmetry, observability ownership, and regression-test oracle validity. A fresh unit, integration, API, migration, fault, or load report can be attached with `--verification-report`; its revision must equal `H0`.
+Frontend lenses cover changed user flows, state, accessibility, dynamic values, client/server contracts and feature-gate behavior. Backend lenses cover changed API behavior, authorization, transactions, retries, concurrency, cancellation and migration compatibility. Inspect the risks the change affects; irrelevant facets do not require a report.
 
-```bash
-node .agents/skills/be-pr-review/scripts/review-graph.mjs plan --repo-root "$PWD" --base origin/main
-node .agents/skills/be-pr-review/scripts/review-graph.mjs run --portable-cli --repo-root "$PWD" --base origin/main --dry-run
-npm run test:be-pr-review
-```
+The dependency-free graph scripts remain available for an explicitly requested full audit. External model execution still requires explicit consent and `--portable-cli`; native review never switches to those runners as a capacity fallback. Existing graph/report regression suites remain in place.
 
 ## second-opinion
 
@@ -258,8 +240,8 @@ node skills/qa-demo/scripts/smoke-testreel.mjs
 ```text
 skills/qa-demo/                 # canonical skill (npx skills add)
 skills/pr-warden/               # canonical PR Warden pack + adapter
-skills/fe-pr-review/             # frontend review graph + provider-neutral runners
-skills/be-pr-review/             # backend review graph + adversarial synthesis
+skills/fe-pr-review/             # focused frontend review + optional graph tools
+skills/be-pr-review/             # focused backend review + optional graph tools
 skills/review/                   # unified target resolver + FE/BE router
 skills/review-learn-from-me/     # authenticated-reviewer learning mode
 skills/review-learn-from-all/    # all-human team learning mode

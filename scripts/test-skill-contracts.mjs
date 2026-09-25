@@ -138,245 +138,55 @@ for (const marker of ['Never merge', '--html', 'GitHub', 'Bitbucket', '3 automat
   assert.ok(warden.includes(marker), `pr-warden missing public contract: ${marker}`)
 }
 
-const feReview = fs.readFileSync(path.join(root, 'skills/fe-pr-review/SKILL.md'), 'utf8')
-for (const marker of [
-  'Unbounded recursive delegation is forbidden',
-  'at most four eligible PRs',
-  'one top-level worker per PR concurrently',
-  'absolute 30-minute deadline',
-  'never more than six',
-  'material overlap',
-  'two focused probe children',
-  'depth 2',
-  'No depth 3',
-  '--max-attempts 2',
-  '--node-timeout-seconds 480',
-  '--synthesis-timeout-seconds 240',
-  '--run-timeout-seconds 1500',
-  'Do not retry every provider',
-  'Stop work that cannot fit the remaining time',
-  'ACCEPT',
-  'REJECT: defect',
-  'REJECT: incomplete',
-  'publication idempotency key',
-  'publish-statlas.mjs',
-  'Verify the returned Statlas URL is reachable',
-  'Scheduled batch mode explicitly authorizes Statlas report publication only',
-  'qa-demo',
-  'opt-in',
-  'explicitly requests',
-  'H0',
-  'UNVERIFIED',
-  'Agent agreement is not proof',
-  'review-graph.mjs',
-  'audit.json',
-  'read-only',
-  'feature-gate path',
-  'report.html',
-  'Statlas',
-  'every assigned facet',
-  'Historical regression probes',
-  'fail-fast',
-  'pre-fix',
-  'parent agent owns the native subagent graph',
-  'must not invoke `cursor-agent`, `claude`, `codex`',
-  'inherit the parent model',
-  'retry once with those overrides omitted',
-  'Never use an external model CLI as a capacity fallback',
-  'native-synthesis.json',
-  'only when the user explicitly requests portable or external CLI review',
-]) {
-  assert.ok(feReview.includes(marker), `fe-pr-review missing public contract: ${marker}`)
+const reviewSkills = ['review', 'fe-pr-review', 'be-pr-review']
+const reviewWorkflow = fs.readFileSync(path.join(root, 'templates/review-workflow.md'))
+const reviewLenses = fs.readFileSync(path.join(root, 'skills/review/references/lenses.md'))
+
+function assertLocalMarkdownLinks(skillRoot, relativeFile) {
+  const source = path.join(skillRoot, relativeFile)
+  const body = fs.readFileSync(source, 'utf8').replace(/```[\s\S]*?```/g, '')
+  for (const match of body.matchAll(/!?\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+[^)]*)?\)/g)) {
+    const href = match[1] ?? match[2]
+    if (/^(?:[a-z][a-z\d+.-]*:|#)/i.test(href)) continue
+    const target = decodeURIComponent(href.split(/[?#]/, 1)[0])
+    assert.ok(!path.isAbsolute(target), `${relativeFile} links to a machine-local path: ${href}`)
+    const resolved = path.resolve(path.dirname(source), target)
+    const relative = path.relative(skillRoot, resolved)
+    assert.ok(relative !== '..' && !relative.startsWith(`..${path.sep}`), `${relativeFile} requires another skill install: ${href}`)
+    assert.ok(fs.existsSync(resolved), `${path.relative(root, source)} has a missing local link: ${href}`)
+  }
 }
 
-// The portable `run` path spends external provider quota, so both graph runners must gate it
-// behind an explicit `--portable-cli` consent flag rather than prose alone.
+for (const name of reviewSkills) {
+  const skillRoot = path.join(root, 'skills', name)
+  assert.deepEqual(fs.readFileSync(path.join(skillRoot, 'references/workflow.md')), reviewWorkflow, `${name} shared workflow drifted`)
+  assert.deepEqual(fs.readFileSync(path.join(skillRoot, 'references/lenses.md')), reviewLenses, `${name} shared review lenses drifted`)
+  for (const file of ['SKILL.md', 'references/workflow.md', 'references/lenses.md']) assertLocalMarkdownLinks(skillRoot, file)
+}
+
 for (const skill of ['fe-pr-review', 'be-pr-review']) {
-  const runner = fs.readFileSync(path.join(root, `skills/${skill}/scripts/review-graph.mjs`), 'utf8')
-  assert.ok(runner.includes('export function assertPortableConsent'), `${skill} must export assertPortableConsent`)
-  assert.ok(runner.includes('assertPortableConsent(args)'), `${skill} must enforce portable consent at the CLI entry point`)
-  assert.ok(runner.includes('run --portable-cli'), `${skill} help must document run as requiring --portable-cli`)
-  const doc = fs.readFileSync(path.join(root, `skills/${skill}/SKILL.md`), 'utf8')
-  assert.ok(doc.includes('--portable-cli'), `${skill} SKILL.md must document the portable consent flag`)
+  const script = path.join(root, `skills/${skill}/scripts/review-graph.mjs`)
+  const denied = spawnSync(process.execPath, [script, 'run'], { cwd: root, encoding: 'utf8', env: { ...process.env, PATH: '' }, timeout: 10000 })
+  assert.equal(denied.error, undefined, `${skill} consent check did not finish`)
+  assert.notEqual(denied.status, 0, `${skill} must refuse external model execution without consent`)
+  assert.match(denied.stderr, /--portable-cli/, `${skill} must explain the missing consent flag`)
+  const runner = fs.readFileSync(script, 'utf8')
+  assert.ok(!/^import .* from '(?!node:|\.)/m.test(runner), `${skill} graph must stay dependency-free`)
+  for (const forbidden of [/--dangerously/, /--yolo/, /bypassPermissions/, /https?:\/\/(?!github\.com|example)/]) {
+    assert.ok(!forbidden.test(runner), `${skill} graph must not contain ${forbidden}`)
+  }
 }
 
-const feContracts = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/contracts.md'), 'utf8')
-for (const marker of [
-  'at most four eligible PRs',
-  'one top-level worker per PR concurrently',
-  'absolute 30-minute deadline',
-  '3-6 persona reviewers',
-  'at most two focused probe children at depth 2',
-  'Depth 3',
-  '--max-workers 4',
-  '--max-attempts 2',
-  '--node-timeout-seconds 480',
-  '--synthesis-timeout-seconds 240',
-  '--run-timeout-seconds 1500',
-  'Do not retry every provider',
-  'ACCEPT',
-  'REJECT: defect',
-  'REJECT: incomplete',
-  'idempotency key',
-  'publish-statlas.mjs',
-  'Verify the returned URL is reachable',
-  'Automatic PR comments',
-  'not-run',
-  'opt-in',
-  'gateRequirement',
-  'report.json',
-  'Runner safety',
-  'Filesystem safety',
-  'Historical regression evidence',
-  'pre-fix behavior',
-  'parent-owned native fan-out is mandatory',
-  'Native reviewer, probe, and synthesis spawns inherit the parent model',
-  'External model CLIs are not a capacity fallback',
-  'Native `plan` and `synthesize` perform no external model discovery or execution',
-  'Portable CLI fallback is allowed only by explicit user request',
-]) {
-  assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing: ${marker}`)
-}
-for (const marker of ['reproduction', 'rootCause', 'suggestedPatch']) {
-  assert.ok(feContracts.includes(marker), `fe-pr-review contracts missing publishable finding field: ${marker}`)
-}
-
-const fePersonas = fs.readFileSync(path.join(root, 'skills/fe-pr-review/references/personas.md'), 'utf8')
 const personaIds = ['repository-contract', 'correctness-platform', 'accessibility-ui', 'rollout-gates', 'privacy-security-data', 'product-tests']
-for (const id of personaIds) assert.ok(fePersonas.includes(id), `personas reference missing ${id}`)
-for (const marker of [
-  '3-6 personas per PR',
-  'no more than six',
-  'parent agent launches the first four selected built-in persona subagents concurrently',
-  'material overlap',
-  'two focused probe children at depth 2',
-  'no depth 3',
-  'disables probe children',
-  'Historical regression probes',
-  'CI-surface parity',
-  'runtime or service-descriptor substitution',
-  'dynamic-key boundaries',
-  'temporal history or cache behavior',
-  'side-effect liveness',
-  'test-oracle validity',
-  'Portable CLI mode is explicit user opt-in only',
-]) {
-  assert.ok(fePersonas.includes(marker), `personas reference missing historical probe marker: ${marker}`)
-}
-
 const feGraph = fs.readFileSync(path.join(root, 'skills/fe-pr-review/scripts/review-graph.mjs'), 'utf8')
 for (const id of personaIds) assert.ok(feGraph.includes(`'${id}'`), `review-graph missing persona ${id}`)
 for (const facet of ['fg-requirement', 'fg-off-path', 'fg-on-path-states', 'fg-persistence-rollback', 'fg-tests', 'fg-cleanup']) assert.ok(feGraph.includes(`'${facet}'`), `review-graph missing gate facet ${facet}`)
 for (const facet of ['ci-surface-parity', 'runtime-config-substitution', 'dependency-resolution-risk', 'dynamic-key-boundaries', 'schema-selection-compatibility', 'temporal-history-cache', 'side-effect-liveness', 'test-oracle-validity']) assert.ok(feGraph.includes(`'${facet}'`), `review-graph missing historical probe ${facet}`)
-assert.ok(!/^import .* from '(?!node:|\.)/m.test(feGraph), 'review-graph must stay dependency-free')
-for (const forbidden of [/--dangerously/, /--yolo/, /bypassPermissions/, /https?:\/\/(?!github\.com|example)/]) {
-  assert.ok(!forbidden.test(feGraph), `review-graph must not contain ${forbidden}`)
-}
 
-
-const beReview = fs.readFileSync(path.join(root, 'skills/be-pr-review/SKILL.md'), 'utf8')
-for (const marker of [
-  'H0',
-  'UNVERIFIED',
-  'Agent agreement is not proof',
-  'review-graph.mjs',
-  '--dry-run',
-  '--verification-report',
-  'audit.json',
-  'read-only',
-  'historical regression probes',
-  'Self-grill',
-  'mixed-version',
-  'partial writes',
-  'migration',
-  'rollback',
-  'pre-fix',
-]) assert.ok(beReview.includes(marker), `be-pr-review missing public contract: ${marker}`)
-
-const beEvaluation = fs.readFileSync(path.join(root, 'skills/be-pr-review/references/evaluation.md'), 'utf8')
-for (const marker of ['train/validation/holdout', 'recurring in at least three independent PRs', 'Negative controls', 'read-check-write races', 'derived-value consistency']) assert.ok(beEvaluation.includes(marker), `be-pr-review evaluation missing ${marker}`)
-const beContracts = fs.readFileSync(path.join(root, 'skills/be-pr-review/references/contracts.md'), 'utf8')
-for (const marker of ['read-check-write atomicity', 'fail-soft fallbacks', 'derived-value consistency', 'explicit verification obligations']) assert.ok(beContracts.includes(marker), `be-pr-review contracts missing ${marker}`)
-for (const marker of ['reproduction', 'rootCause', 'suggestedPatch']) {
-  assert.ok(beContracts.includes(marker), `be-pr-review contracts missing publishable finding field: ${marker}`)
-}
-
-const bePersonas = fs.readFileSync(path.join(root, 'skills/be-pr-review/references/personas.md'), 'utf8')
 const bePersonaIds = ['repository-contract', 'api-compatibility', 'data-migrations', 'concurrency-reliability', 'security-observability-performance', 'tests-rollout']
-for (const id of bePersonaIds) assert.ok(bePersonas.includes(id), `backend personas reference missing ${id}`)
 const beGraph = fs.readFileSync(path.join(root, 'skills/be-pr-review/scripts/review-graph.mjs'), 'utf8')
 for (const id of bePersonaIds) assert.ok(beGraph.includes(`'${id}'`), `backend review graph missing persona ${id}`)
 for (const facet of ['mixed-version-deploy', 'transaction-partial-success', 'retry-idempotency', 'cancellation-deadlines', 'expand-migrate-contract', 'query-algorithm-resource', 'rollout-rollback', 'test-oracle-validity']) assert.ok(beGraph.includes(`'${facet}'`), `backend review graph missing facet ${facet}`)
-assert.ok(!/^import .* from '(?!node:|\.)/m.test(beGraph), 'backend review graph must stay dependency-free')
-
-const review = fs.readFileSync(path.join(root, 'skills/review/SKILL.md'), 'utf8')
-for (const marker of [
-  'name: review',
-  'explicit pull request',
-  'local or remote branch',
-  'fe-pr-review',
-  'be-pr-review',
-  'H0 = worktree:',
-  'staged and unstaged',
-  'untracked file',
-  'Do not route from extensions',
-  'frontend',
-  'backend',
-  'both',
-  'same target, base, complete snapshot, and logical `H0`',
-  'self-authored PR',
-  'PASSABLE',
-  'BLOCKED',
-  'UNVERIFIED',
-  'Never merge',
-  'leyline_memory_recall',
-  '.agents/review-learnings.md',
-  'review-learning.json',
-  'untrusted historical evidence',
-  'leyline_memory_mark_useful',
-  'opt-in',
-  'explicitly requested',
-  'Scheduled batch mode',
-  'at most four eligible',
-  'one top-level worker per PR concurrently',
-  'absolute 30-minute deadline',
-  'Every admitted completed or timed-out PR gets a truthful Statlas report',
-  'REJECT: defect',
-  'REJECT: incomplete',
-  'idempotency key',
-  'Verify the returned URL is reachable',
-  'Do not run broad builds or test suites',
-  'retry every provider',
-  'Automatic PR comments and Slack notifications are outside scheduled review',
-  'parent agent owns the review graph and launches built-in subagents directly',
-  'never substitutes Cursor, Claude, Codex CLI',
-  'inherits its parent model',
-  'Never use an external model runner as a capacity fallback',
-  'unless the user explicitly requests portable CLI review',
-]) assert.ok(review.includes(marker), `review missing unified routing contract: ${marker}`)
-
-const blockerComment = fs.readFileSync(path.join(root, 'skills/review/references/blocking-pr-comment.md'), 'utf8')
-for (const marker of ['### 🔴 Blocker:', '#### 🧪 How to reproduce', '#### 🔎 Root cause', '#### 🛠 Suggested fix', '#### ✅ Focused verification', 'sdlc-review:blocker', 'fingerprint']) {
-  assert.ok(blockerComment.includes(marker), `blocking PR comment format missing ${marker}`)
-}
-
-const contractEditFiles = [
-  'skills/fe-pr-review/SKILL.md',
-  'skills/fe-pr-review/references/contracts.md',
-  'skills/fe-pr-review/references/personas.md',
-  'skills/review/SKILL.md',
-  'scripts/test-skill-contracts.mjs',
-]
-for (const relative of contractEditFiles) {
-  const body = fs.readFileSync(path.join(root, relative), 'utf8')
-  assert.ok(!body.includes('\u2014'), `${relative} must not contain an em dash`)
-}
-
-for (const [name, body] of [['fe-pr-review', feReview], ['be-pr-review', beReview]]) {
-  for (const marker of ['leyline_memory_recall', '.agents/review-learnings.md', 'review-learning.json', 'untrusted historical context', 'leyline_memory_mark_useful']) {
-    assert.ok(body.includes(marker), `${name} missing learned-review contract: ${marker}`)
-  }
-}
 
 const reviewLearnContract = reviewLearningContract.toString('utf8')
 for (const marker of [
@@ -579,6 +389,9 @@ try {
   }
   write('scripts/sync-plugin-mirrors.mjs', syncSrc)
   write('templates/review-learn-contract.md', '# contract\n')
+  write('templates/review-workflow.md', '# workflow\n')
+  write('skills/review/references/lenses.md', '# lenses\n')
+  write('skills/review/references/blocking-pr-comment.md', '# blocker\n')
   for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']) {
     write(`skills/${name}/SKILL.md`, `# ${name}\n`)
   }

@@ -793,7 +793,5 @@ try {
   }).html
   assert.ok(!xssHtml.includes('<img src=x onerror'), 'raw HTML tags must not appear unescaped in the report file')
   assert.ok(xssHtml.includes('u003c'), 'angle brackets in payload should be escaped before embed')
-  const help = fs.readFileSync(new URL('../SKILL.md', import.meta.url), 'utf8')
-  for (const marker of ['qa-demo', 'H0', 'UNVERIFIED', 'Agent agreement is not proof', 'review-graph.mjs']) assert.ok(help.includes(marker), `missing ${marker}`)
 } finally { fs.rmSync(temp, { recursive: true, force: true }) }
 console.log('PASS: fe-pr-review routing, personas, schemas, graph contract, and QA handoff')

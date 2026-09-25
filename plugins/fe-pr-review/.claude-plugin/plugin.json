@@ -1,7 +1,7 @@
 {
   "name": "fe-pr-review",
-  "description": "Provider-neutral frontend PR review with read-only multi-agent fan-out and synthesis. qa-demo visual proof is opt-in.",
-  "version": "0.1.1",
+  "description": "Focused frontend review of changed behavior, accessibility and contracts. Full graph audits and visual QA are opt-in.",
+  "version": "0.2.0",
   "author": {
     "name": "Patrick Lai",
     "url": "https://github.com/patrick-lai"

@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "SDLC agent skills for Claude Code \u2014 QA demos, portable PR Warden, and more",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "pluginRoot": "./plugins"
   },
   "plugins": [
@@ -76,8 +76,8 @@
     {
       "name": "fe-pr-review",
       "source": "./plugins/fe-pr-review",
-      "description": "Provider-neutral frontend PR review with read-only multi-agent fan-out and synthesis. qa-demo visual proof is opt-in.",
-      "version": "0.1.1",
+      "description": "Focused frontend review of changed behavior, accessibility and contracts. Full graph audits and visual QA are opt-in.",
+      "version": "0.2.0",
       "author": {
         "name": "Patrick Lai",
         "url": "https://github.com/patrick-lai"
@@ -107,8 +107,8 @@
     {
       "name": "be-pr-review",
       "source": "./plugins/be-pr-review",
-      "description": "Provider-neutral backend PR review with immutable snapshots, read-only multi-agent fan-out, adversarial synthesis, and revision-bound verification.",
-      "version": "0.1.1",
+      "description": "Focused backend review of changed API, data and runtime behavior. Full graph audits are opt-in.",
+      "version": "0.2.0",
       "author": {
         "name": "Patrick Lai",
         "url": "https://github.com/patrick-lai"
@@ -139,8 +139,8 @@
     {
       "name": "review",
       "source": "./plugins/review",
-      "description": "Unified read-only review for working trees, branches, and PRs with automatic frontend/backend/full-stack routing.",
-      "version": "0.1.0",
+      "description": "Focused read-only review of working trees, branches and PRs with one shared verdict and optional parallel risk checks.",
+      "version": "0.2.0",
       "author": {
         "name": "Patrick Lai",
         "url": "https://github.com/patrick-lai"
