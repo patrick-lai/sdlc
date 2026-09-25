@@ -88,6 +88,11 @@ try {
   git('add', '.')
   git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'base')
   fs.writeFileSync(path.join(repo, 'Server.java'), 'class Server { void save() {} }\n')
+  fs.mkdirSync(path.join(repo, '__generated__'))
+  fs.writeFileSync(path.join(repo, '__generated__/User.graphql.ts'), 'export const generatedToken = "GENERATED_BODY_SENTINEL_DO_NOT_REVIEW"\n')
+  for (let index = 0; index < 24; index++) fs.writeFileSync(path.join(repo, `__generated__/zz-${String(index).padStart(2, '0')}.graphql.ts`), 'export const generated = true\n')
+  fs.writeFileSync(path.join(repo, 'query.graphql'), 'query User { user { id } }\n')
+  fs.writeFileSync(path.join(repo, 'codegen.ts'), 'export const config = { schema: "schema.graphql", documents: "query.graphql" }\n')
   git('add', '.')
   git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'change')
   const head = git('rev-parse', 'HEAD')
@@ -95,6 +100,16 @@ try {
 
   const dry = await runGraph({ command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'dry'), dryRun: true }, { routes: [] })
   assert.equal(dry.audit.status, 'dry-run')
+  const filteredSnapshot = JSON.parse(fs.readFileSync(path.join(temp, 'dry/snapshot/snapshot.json')))
+  assert.deepEqual(filteredSnapshot.changedFiles, ['Server.java', 'codegen.ts', 'query.graphql'])
+  assert.ok(filteredSnapshot.allChangedFiles.includes('__generated__/User.graphql.ts'))
+  assert.equal(filteredSnapshot.omittedFiles.length, 25)
+  assert.equal(filteredSnapshot.omittedFiles[0].path, '__generated__/User.graphql.ts')
+  assert.ok(filteredSnapshot.omittedFiles[0].reason)
+  const filteredPatch = fs.readFileSync(path.join(temp, 'dry/snapshot/diff.patch'), 'utf8')
+  assert.ok(!filteredPatch.includes('GENERATED_BODY_SENTINEL_DO_NOT_REVIEW'))
+  assert.ok(filteredPatch.includes('query User { user { id } }'))
+  assert.ok(filteredPatch.includes('export const config ='))
   assert.equal(dry.plan.personas.length, 5)
   assert.ok(fs.existsSync(path.join(temp, 'dry/snapshot/diff.patch')))
 
@@ -102,6 +117,10 @@ try {
   let calls = 0
   const execute = async (_route, prompt) => {
     calls++
+    assert.ok(!prompt.includes('GENERATED_BODY_SENTINEL_DO_NOT_REVIEW'), 'generated bodies must not enter any reviewer or synthesis prompt')
+    assert.ok(!prompt.includes('__generated__/zz-23.graphql.ts'), 'large omitted inventories must not be repeated in reviewer or synthesis prompts')
+    assert.ok(prompt.includes('25 generated output files omitted'))
+    assert.ok(prompt.includes('snapshot/omitted-files.json'))
     if (prompt.includes('independent synthesis judge')) return JSON.stringify({ blocking: [], nonBlocking: [], unverified: [], operationalFollowUps: [], verdict: 'passable', rationale: 'No verified findings' })
     const persona = prompt.match(/"persona":"([^"]+)"/)?.[1]
     return JSON.stringify({ persona, coverage: coverageFor(persona), ...(persona === 'tests-rollout' ? { rolloutRequirement: rolloutCandidate.rolloutRequirement } : {}), findings: [] })
@@ -155,6 +174,30 @@ try {
     consentMarkers.every((marker) => !fs.existsSync(marker)),
     'run without explicit consent must not invoke Cursor, Claude, or Codex CLI executables',
   )
+  fs.writeFileSync(path.join(repo, '__generated__/User.graphql.ts'), 'export const generatedToken = "GENERATED_ONLY_SENTINEL"\n')
+  git('add', '.')
+  git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'generated outputs only')
+  let generatedOnlyCalls = 0
+  const generatedOnly = await runGraph(
+    { command: 'run', repoRoot: repo, base: 'HEAD^', head: 'HEAD', output: path.join(temp, 'generated-only') },
+    { routes: [fakeRoute], execute: async () => { generatedOnlyCalls++; throw new Error('Generated-only changes must not dispatch model reviews') } },
+  )
+  assert.equal(generatedOnlyCalls, 0)
+  assert.equal(generatedOnly.synthesis.verdict, 'unverified')
+  assert.equal(generatedOnly.audit.status, 'unverified')
+  assert.deepEqual(generatedOnly.plan.personas, [])
+  assert.deepEqual(generatedOnly.plan.graph, [])
+  assert.ok(generatedOnly.synthesis.unverified.length)
+  assert.equal(fs.readFileSync(path.join(temp, 'generated-only/snapshot/diff.patch'), 'utf8'), '')
+  assert.ok(!fs.readFileSync(path.join(temp, 'generated-only/report.json'), 'utf8').includes('GENERATED_ONLY_SENTINEL'))
+  fs.writeFileSync(path.join(temp, 'generated-only/snapshot/diff.patch'), 'GENERATED_BODY_SENTINEL_DO_NOT_REVIEW')
+  await assert.rejects(runGraph({ command: 'synthesize', runDir: path.join(temp, 'generated-only') }, { routes: [fakeRoute], execute }), /Authored patch changed/)
+  const oldSnapshotFile = path.join(temp, 'generated-only/snapshot/snapshot.json')
+  const oldSnapshot = JSON.parse(fs.readFileSync(oldSnapshotFile))
+  delete oldSnapshot.omittedFiles
+  delete oldSnapshot.authoredPatchHash
+  fs.writeFileSync(oldSnapshotFile, JSON.stringify(oldSnapshot))
+  await assert.rejects(runGraph({ command: 'synthesize', runDir: path.join(temp, 'generated-only') }, { routes: [fakeRoute], execute }), /fresh filtered snapshot/)
 } finally {
   fs.rmSync(temp, { recursive: true, force: true })
 }

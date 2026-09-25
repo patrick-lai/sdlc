@@ -1,7 +1,7 @@
 {
   "name": "second-opinion",
   "description": "Cheap native-model second-opinion review via the host agent's own subagent. Explicit /second-opinion or implicit when AGENTS.md says to use it for all sessions.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Patrick Lai",
     "url": "https://github.com/patrick-lai"

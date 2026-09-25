@@ -141,6 +141,8 @@ for (const marker of ['Never merge', '--html', 'GitHub', 'Bitbucket', '3 automat
 const reviewSkills = ['review', 'fe-pr-review', 'be-pr-review']
 const reviewWorkflow = fs.readFileSync(path.join(root, 'templates/review-workflow.md'))
 const reviewLenses = fs.readFileSync(path.join(root, 'skills/review/references/lenses.md'))
+const generatedFiles = fs.readFileSync(path.join(root, 'skills/review/references/generated-files.md'))
+const reviewContext = fs.readFileSync(path.join(root, 'skills/review/scripts/review-context.mjs'))
 
 function assertLocalMarkdownLinks(skillRoot, relativeFile) {
   const source = path.join(skillRoot, relativeFile)
@@ -162,6 +164,13 @@ for (const name of reviewSkills) {
   assert.deepEqual(fs.readFileSync(path.join(skillRoot, 'references/workflow.md')), reviewWorkflow, `${name} shared workflow drifted`)
   assert.deepEqual(fs.readFileSync(path.join(skillRoot, 'references/lenses.md')), reviewLenses, `${name} shared review lenses drifted`)
   for (const file of ['SKILL.md', 'references/workflow.md', 'references/lenses.md']) assertLocalMarkdownLinks(skillRoot, file)
+}
+
+for (const name of [...reviewSkills, 'second-opinion']) {
+  const skillRoot = path.join(root, 'skills', name)
+  assert.deepEqual(fs.readFileSync(path.join(skillRoot, 'references/generated-files.md')), generatedFiles, `${name} generated-file guidance drifted`)
+  assert.deepEqual(fs.readFileSync(path.join(skillRoot, 'scripts/review-context.mjs')), reviewContext, `${name} review context helper drifted`)
+  assertLocalMarkdownLinks(skillRoot, 'references/generated-files.md')
 }
 
 for (const skill of ['fe-pr-review', 'be-pr-review']) {
@@ -392,6 +401,8 @@ try {
   write('templates/review-workflow.md', '# workflow\n')
   write('skills/review/references/lenses.md', '# lenses\n')
   write('skills/review/references/blocking-pr-comment.md', '# blocker\n')
+  write('skills/review/references/generated-files.md', '# generated\n')
+  write('skills/review/scripts/review-context.mjs', 'export const fixture = true\n')
   for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']) {
     write(`skills/${name}/SKILL.md`, `# ${name}\n`)
   }

@@ -10,6 +10,7 @@ Use JEV when a bounded semantic choice replaces expensive discovery. Keep implem
 ## Choose the next action
 
 - When a file path, symbol, source title or skill name is known, read it directly or use exact search with `rg`. An explicit process exit code also needs no classifier.
+- Keep confirmed generated output out of broad searches, pasted diffs and subagent context, including Relay/GraphQL compiler files. Read the authored schema, operations and generator inputs instead. Retain omitted-path metadata; inspect a generated symbol only for a concrete discrepancy or an explicit request. Do not blanket-exclude handwritten `.graphql` or `.gql` sources.
 - Read independent files and run independent read-only lookups together when your tools permit it. Keep dependent steps and shared mutations sequential. Delegate a bounded task only when it can finish alongside useful work in the current session.
 - For unfamiliar material, use a focused semantic lookup only through an available client authorized for the task. Check its suggestion against the full relevant source and source index before deciding. Keep source selection and passage selection sequential when one determines the input to the other.
 - Reuse a result while its evidence, question, criteria and provider settings remain unchanged. Do not paraphrase a query merely to ask it again.

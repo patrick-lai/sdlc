@@ -2,6 +2,8 @@
 
 This reference describes the optional legacy runner and its formal audit artifacts. Read it only when explicitly requested. Ordinary native parallel specialists use the shared workflow and do not need these runner, synthesis-node or report requirements. The host still owns models, quotas and any existing panel.
 
+Generated-file filtering applies to this legacy workflow too. Snapshot prompts contain authored patches and omission metadata; do not reload the omitted outputs by default. See [generated-file filtering](generated-files.md).
+
 # fe-pr-review
 
 Coordinate a fast, high-signal frontend PR review without depending on one forge, company CLI, or model vendor. Use bounded parallelism, immutable evidence, and one truthful report per admitted PR. Unbounded recursive delegation is forbidden because it multiplies load, retries, and correlated conclusions without preserving the deadline.

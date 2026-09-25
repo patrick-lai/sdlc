@@ -2,6 +2,8 @@
 
 This reference describes the optional legacy runner and its formal audit artifacts. Read it only when explicitly requested. Ordinary native parallel specialists use the shared workflow and do not need these runner, synthesis-node or report requirements. The host still owns models, quotas and any existing panel.
 
+Generated-file filtering applies to this legacy workflow too. Snapshot prompts contain authored patches and omission metadata; do not reload the omitted outputs by default. See [generated-file filtering](generated-files.md).
+
 # review
 
 Resolve review targets, freeze them, classify their contracts, and delegate to `fe-pr-review`, `be-pr-review`, or both. This skill is a thin router for one target and the outer coordinator for scheduled batch mode. It reuses specialist graphs rather than copying their personas.

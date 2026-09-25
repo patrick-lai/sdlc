@@ -1,6 +1,6 @@
 {
   "name": "@patrick-lai/sdlc",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "SDLC agent skills for Claude Code and Codex \u2014 install with npx skills add patrick-lai/sdlc",
   "license": "MIT",
   "type": "module",
@@ -66,6 +66,7 @@
     "pr-warden": "node skills/pr-warden/scripts/adapter.mjs",
     "test:fe-pr-review": "node skills/fe-pr-review/scripts/test-review-graph.mjs && node skills/fe-pr-review/scripts/test-publish-statlas.mjs",
     "test:fe-pr-review:statlas": "node skills/fe-pr-review/scripts/test-publish-statlas.mjs",
-    "test:be-pr-review": "node skills/be-pr-review/scripts/test-review-graph.mjs"
+    "test:be-pr-review": "node skills/be-pr-review/scripts/test-review-graph.mjs",
+    "test:review-context": "node scripts/test-review-context.mjs"
   }
 }

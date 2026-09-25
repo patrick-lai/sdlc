@@ -1,7 +1,7 @@
 {
   "name": "jev-fast-coding",
   "description": "Reduce coding-session overhead with selective JEV discovery and evidence-based verification.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Patrick Lai",
     "url": "https://github.com/patrick-lai"

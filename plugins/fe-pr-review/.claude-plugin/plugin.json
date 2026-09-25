@@ -1,7 +1,7 @@
 {
   "name": "fe-pr-review",
   "description": "Parallel frontend review specialists with focused risk assignments and one evidence-backed verdict. Visual QA remains opt-in.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "author": {
     "name": "Patrick Lai",
     "url": "https://github.com/patrick-lai"

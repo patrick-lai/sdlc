@@ -113,6 +113,8 @@ FE and BE share one snapshot, one coverage map and one verdict. An existing host
 
 Keep frozen revisions, dirty-worktree coverage, disconfirming evidence, root-cause deduplication and every verified material finding. Existing relevant review lessons remain useful probes. A [small serial/parallel trial](fixtures/review-parallel/README.md) found the same four seeded defects in both modes; startup erased the parallel stage saving, so it is not proof of an overall speedup.
 
+Generated output bodies are omitted before review fan-out, including Relay/GraphQL compiler files. The shared context helper emits an authored-only patch and separate omission inventory. Reviewers inspect the source schema, operations and generator inputs instead; handwritten GraphQL, migrations, lockfiles and tests remain in scope. See [generated-file filtering](skills/review/references/generated-files.md).
+
 The legacy runner and formal audit artifacts are available only by explicit request. `qa-demo` is opt-in. Report publication and PR comments also require a request. [Workflow](skills/review/references/workflow.md) and [lenses](skills/review/references/lenses.md) describe the default.
 
 ## review-learn-from-me and review-learn-from-all
@@ -199,6 +201,7 @@ Repository checks:
 npm run smoke:install       # temp-project install of all skills
 npm run test:pr-warden      # policy, providers, ledger, trusted paths
 npm run test:skills          # public-safe content + canonical/plugin parity
+npm run test:review-context  # generated omission + authored coverage + read-only snapshots
 npm run test:fe-pr-review    # frontend fan-out, schemas, graph, QA handoff
 npm run test:be-pr-review    # backend fan-out, adversarial graph, verification
 npm run smoke:testreel      # fresh captioned qa-demo recording

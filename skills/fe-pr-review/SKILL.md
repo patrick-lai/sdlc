@@ -11,4 +11,6 @@ Do not start a second graph, reclassify the whole repository or repeat another r
 
 Normal native fan-out uses the shared workflow. Read [the legacy graph workflow](references/deep-review.md) only for an explicitly requested legacy runner or formal audit-artifact contract. Its external runner requires explicit consent and `--portable-cli`; it is never a capacity fallback. Resolve script paths from this installed skill directory and keep the reviewed repository as the working directory.
 
+Prepare [authored-only review context](references/generated-files.md) before reading patches or starting reviewers. Generated Relay/GraphQL output bodies are omitted by default; handwritten schemas, operations and generator inputs remain in scope.
+
 For explicitly requested inline blocker comments, use [the publication format](references/blocking-pr-comment.md). Source edits, PR approval, merge and unrelated publication remain outside a review request.

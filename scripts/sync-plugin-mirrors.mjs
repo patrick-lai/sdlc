@@ -10,6 +10,8 @@ const reviewLearningContract = path.join(root, 'templates/review-learn-contract.
 const reviewWorkflow = path.join(root, 'templates/review-workflow.md')
 const reviewLenses = path.join(root, 'skills/review/references/lenses.md')
 const blockerComment = path.join(root, 'skills/review/references/blocking-pr-comment.md')
+const generatedFiles = path.join(root, 'skills/review/references/generated-files.md')
+const reviewContext = path.join(root, 'skills/review/scripts/review-context.mjs')
 const agentPath = path.join(root, 'plugins/second-opinion/agents/second-opinion.md')
 const reviewerPath = path.join(root, 'skills/second-opinion/references/reviewer.md')
 
@@ -30,6 +32,8 @@ requireFile(reviewLearningContract, 'canonical review-learning contract')
 requireFile(reviewWorkflow, 'canonical review workflow')
 requireFile(reviewLenses, 'canonical review lenses')
 requireFile(blockerComment, 'canonical blocker comment format')
+requireFile(generatedFiles, 'canonical generated-file guidance')
+requireFile(reviewContext, 'canonical review context helper')
 for (const name of reviewLearningVariants) {
   const canonical = path.join(root, 'skills', name)
   requireDirectory(canonical, `canonical review-learning variant ${name}`)
@@ -62,6 +66,14 @@ for (const name of ['review', 'fe-pr-review', 'be-pr-review']) {
     fs.copyFileSync(reviewLenses, path.join(references, 'lenses.md'))
     fs.copyFileSync(blockerComment, path.join(references, 'blocking-pr-comment.md'))
   }
+}
+
+for (const name of ['fe-pr-review', 'be-pr-review', 'second-opinion']) {
+  const canonical = path.join(root, 'skills', name)
+  fs.mkdirSync(path.join(canonical, 'references'), { recursive: true })
+  fs.mkdirSync(path.join(canonical, 'scripts'), { recursive: true })
+  fs.copyFileSync(generatedFiles, path.join(canonical, 'references/generated-files.md'))
+  fs.copyFileSync(reviewContext, path.join(canonical, 'scripts/review-context.mjs'))
 }
 
 for (const name of regularSkills) {
