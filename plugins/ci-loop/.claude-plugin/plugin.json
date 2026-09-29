@@ -1,0 +1,19 @@
+{
+  "name": "ci-loop",
+  "description": "CI-first verification for large monorepos: cheap local checks, then push, watch the pipeline for the head commit, fix red checks from logs, and stop when green. Never merges.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Patrick Lai",
+    "url": "https://github.com/patrick-lai"
+  },
+  "repository": "https://github.com/patrick-lai/sdlc",
+  "license": "MIT",
+  "keywords": [
+    "ci",
+    "monorepo",
+    "pipeline",
+    "github",
+    "bitbucket",
+    "sdlc"
+  ]
+}

@@ -36,7 +36,7 @@ function assertMirror(name) {
   }
 }
 
-for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']) assertMirror(name)
+for (const name of ['pr-warden', 'qa-demo', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding', 'ci-loop']) assertMirror(name)
 
 const reviewLearningVariants = ['review-learn-from-me', 'review-learn-from-all']
 const reviewLearningContractPath = path.join(root, 'templates/review-learn-contract.md')
@@ -275,7 +275,7 @@ assert.equal(Object.keys(pkg.devDependencies || {}).length, 0, 'skills must stay
 // Marketplace entries must resolve to a real plugin with a matching manifest.
 const marketplace = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin/marketplace.json'), 'utf8'))
 const marketplaceNames = marketplace.plugins.map((entry) => entry.name)
-for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']) {
+for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding', 'ci-loop']) {
   assert.ok(marketplaceNames.includes(name), `marketplace missing plugin ${name}`)
   const entry = marketplace.plugins.find((plugin) => plugin.name === name)
   assert.equal(entry.source, `./plugins/${name}`)
@@ -403,7 +403,7 @@ try {
   write('skills/review/references/blocking-pr-comment.md', '# blocker\n')
   write('skills/review/references/generated-files.md', '# generated\n')
   write('skills/review/scripts/review-context.mjs', 'export const fixture = true\n')
-  for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']) {
+  for (const name of ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding', 'ci-loop']) {
     write(`skills/${name}/SKILL.md`, `# ${name}\n`)
   }
   write('skills/review-learn-from-me/SKILL.md', '# from me\n')
@@ -454,5 +454,18 @@ try {
 } finally {
   fs.rmSync(syncFixture, { recursive: true, force: true })
 }
+
+const ciLoop = fs.readFileSync(path.join(root, 'skills/ci-loop/SKILL.md'), 'utf8')
+for (const marker of [
+  'CI is the verdict',
+  'pipeline whose\n   commit equals that SHA counts',
+  'at most 3 fix pushes',
+  'Unknown is not green',
+  'never merge, approve, dismiss a review, or mark a',
+  'pr-warden',
+]) {
+  assert.ok(ciLoop.includes(marker), `ci-loop missing public contract: ${marker}`)
+}
+assert.ok(fs.existsSync(path.join(root, 'skills/ci-loop/references/providers.md')), 'ci-loop missing providers reference')
 
 console.log('PASS: public skill contracts, mirrors, packaging, and internal-leak guard')

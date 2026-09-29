@@ -42,7 +42,10 @@
     "leyline",
     "second-opinion",
     "jev",
-    "coding-speed"
+    "coding-speed",
+    "ci-loop",
+    "monorepo",
+    "ci"
   ],
   "files": [
     "skills",

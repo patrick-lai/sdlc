@@ -5,7 +5,7 @@
     "url": "https://github.com/patrick-lai"
   },
   "metadata": {
-    "description": "SDLC agent skills for Claude Code \u2014 QA demos, portable PR Warden, and more",
+    "description": "SDLC agent skills for Claude Code — QA demos, portable PR Warden, and more",
     "version": "0.8.0",
     "pluginRoot": "./plugins"
   },
@@ -251,6 +251,36 @@
       ],
       "skills": [
         "./skills/jev-fast-coding"
+      ]
+    },
+    {
+      "name": "ci-loop",
+      "source": "./plugins/ci-loop",
+      "description": "CI-first verification for large monorepos: cheap local checks, then push, watch the pipeline for the head commit, fix red checks from logs, and stop when green. Never merges.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Patrick Lai",
+        "url": "https://github.com/patrick-lai"
+      },
+      "repository": "https://github.com/patrick-lai/sdlc",
+      "license": "MIT",
+      "keywords": [
+        "ci",
+        "monorepo",
+        "pipeline",
+        "github",
+        "bitbucket",
+        "verification"
+      ],
+      "category": "productivity",
+      "tags": [
+        "ci",
+        "monorepo",
+        "pipeline",
+        "verification"
+      ],
+      "skills": [
+        "./skills/ci-loop"
       ]
     }
   ]

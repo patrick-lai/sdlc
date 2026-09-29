@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const regularSkills = ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding']
+const regularSkills = ['qa-demo', 'pr-warden', 'fe-pr-review', 'be-pr-review', 'review', 'second-opinion', 'jev-fast-coding', 'ci-loop']
 const reviewLearningVariants = ['review-learn-from-me', 'review-learn-from-all']
 const reviewLearningContract = path.join(root, 'templates/review-learn-contract.md')
 const reviewWorkflow = path.join(root, 'templates/review-workflow.md')

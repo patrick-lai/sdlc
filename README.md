@@ -34,6 +34,7 @@ Most agents share **one** project install root: **`.agents/skills/`**.
 | **Cursor** | `.agents/skills/` | skills CLI `-a cursor` |
 | **Grok Build** | reads `.agents/skills/` **and** `.grok/skills/` | Do **not** also pass `-a grok` for project install — that duplicates into `.grok/skills/` |
 | **Claude Code** | via plugin marketplace (below) and/or Agent Skills CLI | |
+| **ci-loop** | For large monorepos that cannot be fully built or tested locally: run only cheap local checks, then push, watch the pipeline for the head commit, fix red checks from logs, and stop when required checks are green. Never merges. |
 
 ```bash
 # Preferred: one project install (Codex + Cursor + Grok all see it)
@@ -46,6 +47,7 @@ npx skills add patrick-lai/sdlc --skill review-learn-from-me -a cursor -y
 npx skills add patrick-lai/sdlc --skill review-learn-from-all -a cursor -y
 npx skills add patrick-lai/sdlc --skill second-opinion -a cursor -y
 npx skills add patrick-lai/sdlc --skill jev-fast-coding -a cursor -y
+npx skills add patrick-lai/sdlc --skill ci-loop -a cursor -y
 # equivalent project root for codex-only auto-detect:
 # npx skills add patrick-lai/sdlc --skill pr-warden -a codex -y
 
@@ -75,6 +77,7 @@ npx skills add patrick-lai/sdlc --skill qa-demo -a cursor -a codex -a grok -y
 /plugin install review-learn@sdlc
 /plugin install second-opinion@sdlc
 /plugin install jev-fast-coding@sdlc
+/plugin install ci-loop@sdlc
 ```
 
 ## Managed portable skills
