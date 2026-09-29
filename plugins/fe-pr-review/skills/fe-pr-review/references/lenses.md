@@ -19,4 +19,4 @@ Select the risks touched by this change. These are prompts for inspection, not m
 - For schema, API or migration changes, trace consumers, mixed-version compatibility, deploy order and recovery. Check only rollout obligations required by current policy or a concrete risk.
 - Check query bounds, secrets and identifier scope where the diff changes their treatment. Avoid scale fears without a reachable input or measured constraint.
 
-For either area, use tests as evidence for the claimed behavior. A regression test should distinguish the old wrong path from the intended one. Check nearby sibling paths only when they share the changed invariant.
+For either area, read the implementations, exports, manifests, tests and nearby patterns around a change, not only its changed lines, and check sibling conventions before calling one violated. Use tests as evidence for the claimed behavior. A regression test should distinguish the old wrong path from the intended one. Check nearby sibling paths only when they share the changed invariant.
